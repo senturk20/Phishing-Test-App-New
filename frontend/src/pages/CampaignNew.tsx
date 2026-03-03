@@ -53,7 +53,7 @@ export function CampaignNew() {
     templateMode: 'random' as 'random' | 'specific',
     templateId: '',
     phishDomain: 'random',
-    landingPageId: 'default',
+    landingPageId: '',
     addClickersToGroup: '',
     sendReportEmail: true,
   });

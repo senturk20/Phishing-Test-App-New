@@ -9,6 +9,17 @@ export const config = {
   databaseUrl: process.env.DATABASE_URL,
   useMemoryDb: process.env.USE_MEMORY_DB === 'true' || !process.env.DATABASE_URL,
 
+  // SMTP Configuration (MailHog default)
+  smtp: {
+    host: process.env.SMTP_HOST || 'mailhog',
+    port: parseInt(process.env.SMTP_PORT || '1025', 10),
+    fromAddress: process.env.SMTP_FROM || 'noreply@university.edu.tr',
+    fromName: process.env.SMTP_FROM_NAME || 'IT Departmanı',
+  },
+
+  // Tracking URL base (where phishing links point to)
+  trackingBaseUrl: process.env.TRACKING_BASE_URL || 'http://localhost',
+
   // LDAP Configuration
   ldap: {
     url: process.env.LDAP_URL || 'ldap://localhost:389',

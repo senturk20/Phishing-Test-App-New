@@ -2,6 +2,33 @@
 -- PostgreSQL
 
 -- ============================================
+-- EMAIL TEMPLATES TABLE
+-- (Created before campaigns due to foreign key reference)
+-- ============================================
+CREATE TABLE IF NOT EXISTS email_templates (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    subject VARCHAR(500) NOT NULL,
+    body TEXT NOT NULL,
+    is_default BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- LANDING PAGES TABLE
+-- (Created before campaigns due to foreign key reference)
+-- ============================================
+CREATE TABLE IF NOT EXISTS landing_pages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    html TEXT NOT NULL,
+    is_default BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
 -- CAMPAIGNS TABLE
 -- ============================================
 CREATE TABLE IF NOT EXISTS campaigns (
@@ -76,31 +103,6 @@ CREATE TABLE IF NOT EXISTS recipients (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     -- Unique constraint for LDAP sync (same email can be in different campaigns)
     CONSTRAINT unique_campaign_email UNIQUE (campaign_id, email)
-);
-
--- ============================================
--- EMAIL TEMPLATES TABLE
--- ============================================
-CREATE TABLE IF NOT EXISTS email_templates (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
-    subject VARCHAR(500) NOT NULL,
-    body TEXT NOT NULL,
-    is_default BOOLEAN DEFAULT false,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- ============================================
--- LANDING PAGES TABLE
--- ============================================
-CREATE TABLE IF NOT EXISTS landing_pages (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
-    html TEXT NOT NULL,
-    is_default BOOLEAN DEFAULT false,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- ============================================

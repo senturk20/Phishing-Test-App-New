@@ -12,10 +12,19 @@ import {
   eventRoutes,
   dashboardRoutes,
   ldapRoutes,
+  trackingRoutes,
 } from './routes/index.js';
 import { closeLdapConnection } from './services/index.js';
 
 const app = express();
+
+// ============================================
+// TRACKING ROUTE (before security middleware)
+// ============================================
+// The /t/:token endpoint serves landing page HTML from the DB which
+// contains inline scripts and styles. It must be registered BEFORE
+// helmet/CSP so those inline resources are not blocked.
+app.use('/t', trackingRoutes);
 
 // ============================================
 // MIDDLEWARE

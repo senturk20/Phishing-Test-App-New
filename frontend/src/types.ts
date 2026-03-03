@@ -10,6 +10,24 @@ export interface Campaign {
   description: string;
   status: CampaignStatus;
   targetCount: number;
+  frequency?: string;
+  startDate?: string;
+  startTime?: string;
+  timezone?: string;
+  sendingMode?: string;
+  spreadDays?: number;
+  spreadUnit?: string;
+  businessHoursStart?: string;
+  businessHoursEnd?: string;
+  businessDays?: string[];
+  trackActivityDays?: number;
+  category?: string;
+  templateMode?: string;
+  templateId?: string;
+  phishDomain?: string;
+  landingPageId?: string;
+  addClickersToGroup?: string;
+  sendReportEmail?: boolean;
   createdAt: string;
   updatedAt: string;
 }

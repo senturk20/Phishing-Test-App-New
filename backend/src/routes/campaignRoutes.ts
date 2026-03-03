@@ -23,6 +23,24 @@ interface CreateCampaignBody {
   name: string;
   description?: string;
   targetCount?: number;
+  frequency?: string;
+  startDate?: string;
+  startTime?: string;
+  timezone?: string;
+  sendingMode?: string;
+  spreadDays?: number;
+  spreadUnit?: string;
+  businessHoursStart?: string;
+  businessHoursEnd?: string;
+  businessDays?: string[];
+  trackActivityDays?: number;
+  category?: string;
+  templateMode?: string;
+  templateId?: string;
+  phishDomain?: string;
+  landingPageId?: string;
+  addClickersToGroup?: string;
+  sendReportEmail?: boolean;
 }
 
 function isValidCreateCampaign(body: unknown): body is CreateCampaignBody {
@@ -83,10 +101,29 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       return;
     }
 
+    const b = req.body;
     const campaign = await createCampaign({
-      name: req.body.name.trim(),
-      description: (req.body.description || '').trim(),
-      targetCount: req.body.targetCount || 10,
+      name: b.name.trim(),
+      description: (b.description || '').trim(),
+      targetCount: b.targetCount || 0,
+      frequency: b.frequency,
+      startDate: b.startDate,
+      startTime: b.startTime,
+      timezone: b.timezone,
+      sendingMode: b.sendingMode,
+      spreadDays: b.spreadDays,
+      spreadUnit: b.spreadUnit,
+      businessHoursStart: b.businessHoursStart,
+      businessHoursEnd: b.businessHoursEnd,
+      businessDays: b.businessDays,
+      trackActivityDays: b.trackActivityDays,
+      category: b.category,
+      templateMode: b.templateMode,
+      templateId: b.templateId,
+      phishDomain: b.phishDomain,
+      landingPageId: b.landingPageId,
+      addClickersToGroup: b.addClickersToGroup,
+      sendReportEmail: b.sendReportEmail,
     });
 
     res.status(201).json(campaign);

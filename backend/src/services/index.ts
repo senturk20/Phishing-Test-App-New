@@ -46,6 +46,10 @@ export {
 // Dashboard Service
 export { getDashboardStats } from './dashboardService.js';
 
+// Mail Service
+export { sendEmail } from './mailService.js';
+export type { SendEmailParams } from './mailService.js';
+
 // LDAP Service
 export {
   testLdapConnection,

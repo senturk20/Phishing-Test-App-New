@@ -1,6 +1,9 @@
 import { config } from '../config.js';
 import { getPool, memoryStore, generateId } from '../db/index.js';
 import type { Campaign, CampaignStats } from '../types/index.js';
+import { getRecipientsByCampaign, updateRecipientStatus } from './recipientService.js';
+import { getEmailTemplate, getEmailTemplates } from './templateService.js';
+import { sendEmail } from './mailService.js';
 
 // ============================================
 // GET CAMPAIGNS
@@ -382,61 +385,127 @@ export async function deleteCampaign(id: string): Promise<boolean> {
 // ============================================
 
 export async function startCampaign(id: string): Promise<Campaign | null> {
+  let campaign: Campaign | null = null;
+
+  // --- Set status to active ---
   if (config.useMemoryDb) {
-    const campaign = memoryStore.campaigns.find((c) => c.id === id);
-    if (campaign && campaign.status === 'draft') {
-      campaign.status = 'active';
-      campaign.updatedAt = new Date();
-      console.log(`Campaign started: ${campaign.name}`);
-      return campaign;
+    const found = memoryStore.campaigns.find((c) => c.id === id);
+    if (found && found.status === 'draft') {
+      found.status = 'active';
+      found.updatedAt = new Date();
+      campaign = found;
     }
-    return null;
+  } else {
+    const p = await getPool();
+    if (!p) return null;
+
+    const result = await p.query(
+      `UPDATE campaigns SET status = 'active', updated_at = NOW()
+       WHERE id = $1 AND status = 'draft'
+       RETURNING *`,
+      [id]
+    );
+
+    if (result.rows.length > 0) {
+      const row = result.rows[0];
+      campaign = {
+        id: row.id,
+        name: row.name,
+        description: row.description,
+        status: row.status,
+        targetCount: row.target_count,
+        frequency: row.frequency,
+        startDate: row.start_date,
+        startTime: row.start_time,
+        timezone: row.timezone,
+        sendingMode: row.sending_mode,
+        spreadDays: row.spread_days,
+        spreadUnit: row.spread_unit,
+        businessHoursStart: row.business_hours_start,
+        businessHoursEnd: row.business_hours_end,
+        businessDays: JSON.parse(row.business_days || '[]'),
+        trackActivityDays: row.track_activity_days,
+        category: row.category,
+        templateMode: row.template_mode,
+        templateId: row.template_id,
+        phishDomain: row.phish_domain,
+        landingPageId: row.landing_page_id,
+        addClickersToGroup: row.add_clickers_to_group,
+        sendReportEmail: row.send_report_email,
+        nextRunAt: row.next_run_at,
+        lastRunAt: row.last_run_at,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      };
+    }
   }
 
-  const p = await getPool();
-  if (!p) return null;
+  if (!campaign) return null;
 
-  const result = await p.query(
-    `UPDATE campaigns SET status = 'active', updated_at = NOW()
-     WHERE id = $1 AND status = 'draft'
-     RETURNING *`,
-    [id]
-  );
+  console.log(`Campaign started: ${campaign.name}`);
 
-  if (result.rows.length === 0) return null;
+  // --- Resolve email template ---
+  let templateSubject = 'Acil: Şifrenizi Güncellemeniz Gerekmektedir';
+  let templateBody = '<p>Sayın {{firstName}},</p><p>Lütfen <a href="{{trackingLink}}">buraya tıklayın</a>.</p>';
 
-  const row = result.rows[0];
-  console.log(`Campaign started: ${row.name}`);
+  if (campaign.templateMode === 'specific' && campaign.templateId) {
+    const tpl = await getEmailTemplate(campaign.templateId);
+    if (tpl) {
+      templateSubject = tpl.subject;
+      templateBody = tpl.body;
+    }
+  } else {
+    // Random mode — pick a random template from the DB
+    const allTemplates = await getEmailTemplates();
+    if (allTemplates.length > 0) {
+      const picked = allTemplates[Math.floor(Math.random() * allTemplates.length)];
+      templateSubject = picked.subject;
+      templateBody = picked.body;
+    }
+  }
 
-  return {
-    id: row.id,
-    name: row.name,
-    description: row.description,
-    status: row.status,
-    targetCount: row.target_count,
-    frequency: row.frequency,
-    startDate: row.start_date,
-    startTime: row.start_time,
-    timezone: row.timezone,
-    sendingMode: row.sending_mode,
-    spreadDays: row.spread_days,
-    spreadUnit: row.spread_unit,
-    businessHoursStart: row.business_hours_start,
-    businessHoursEnd: row.business_hours_end,
-    businessDays: JSON.parse(row.business_days || '[]'),
-    trackActivityDays: row.track_activity_days,
-    category: row.category,
-    templateMode: row.template_mode,
-    templateId: row.template_id,
-    phishDomain: row.phish_domain,
-    landingPageId: row.landing_page_id,
-    addClickersToGroup: row.add_clickers_to_group,
-    sendReportEmail: row.send_report_email,
-    nextRunAt: row.next_run_at,
-    lastRunAt: row.last_run_at,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
+  // --- Build tracking URL base ---
+  // Tracking URLs point to the backend's /t/:token endpoint via the configured base URL.
+  // In Docker: nginx on port 80 proxies /t/ to the backend.
+  const trackingBase = config.trackingBaseUrl.replace(/\/+$/, '');
+
+  // --- Dispatch emails to all recipients ---
+  const recipients = await getRecipientsByCampaign(id);
+  let sentCount = 0;
+
+  for (const recipient of recipients) {
+    try {
+      const trackingLink = `${trackingBase}/t/${recipient.token}`;
+
+      // Replace placeholders in the template
+      const html = templateBody
+        .replace(/\{\{firstName\}\}/g, recipient.firstName || '')
+        .replace(/\{\{lastName\}\}/g, recipient.lastName || '')
+        .replace(/\{\{trackingLink\}\}/g, trackingLink)
+        .replace(/\{\{email\}\}/g, recipient.email);
+
+      const subject = templateSubject
+        .replace(/\{\{firstName\}\}/g, recipient.firstName || '')
+        .replace(/\{\{lastName\}\}/g, recipient.lastName || '');
+
+      const success = await sendEmail({
+        to: recipient.email,
+        subject,
+        html,
+      });
+
+      if (success) {
+        await updateRecipientStatus(recipient.token, 'sent');
+        sentCount++;
+      }
+    } catch (error) {
+      console.error(`Failed to send email to ${recipient.email}:`, error);
+    }
+  }
+
+  console.log(`Campaign "${campaign.name}": ${sentCount}/${recipients.length} emails sent`);
+
+  return campaign;
 }
 
 // ============================================
@@ -630,10 +699,11 @@ export async function completeCampaign(id: string): Promise<Campaign | null> {
 // ============================================
 
 export async function getCampaignStats(campaignId: string): Promise<CampaignStats> {
-  const campaign = await getCampaign(campaignId);
-  const totalTargets = campaign?.targetCount || 0;
-
   if (config.useMemoryDb) {
+    const recipients = memoryStore.recipients.filter((r) => r.campaignId === campaignId);
+    const totalTargets = recipients.length;
+    const emailsSent = recipients.filter((r) => r.status !== 'pending').length;
+
     const events = memoryStore.events.filter((e) => e.campaignId === campaignId);
     const clickedTokens = new Set(events.filter((e) => e.type === 'clicked').map((e) => e.recipientToken));
     const submittedTokens = new Set(events.filter((e) => e.type === 'submitted').map((e) => e.recipientToken));
@@ -643,7 +713,7 @@ export async function getCampaignStats(campaignId: string): Promise<CampaignStat
 
     return {
       totalTargets,
-      emailsSent: totalTargets,
+      emailsSent,
       clicked,
       submitted,
       clickRate: totalTargets > 0 ? (clicked / totalTargets) * 100 : 0,
@@ -653,8 +723,18 @@ export async function getCampaignStats(campaignId: string): Promise<CampaignStat
 
   const p = await getPool();
   if (!p) {
-    return { totalTargets, emailsSent: 0, clicked: 0, submitted: 0, clickRate: 0, submitRate: 0 };
+    return { totalTargets: 0, emailsSent: 0, clicked: 0, submitted: 0, clickRate: 0, submitRate: 0 };
   }
+
+  const recipientResult = await p.query(
+    `SELECT COUNT(*) as total,
+            COUNT(CASE WHEN status != 'pending' THEN 1 END) as sent
+     FROM recipients WHERE campaign_id = $1`,
+    [campaignId]
+  );
+
+  const totalTargets = parseInt(recipientResult.rows[0].total, 10);
+  const emailsSent = parseInt(recipientResult.rows[0].sent, 10);
 
   const clickedResult = await p.query(
     `SELECT COUNT(DISTINCT recipient_token) as count FROM events
@@ -673,7 +753,7 @@ export async function getCampaignStats(campaignId: string): Promise<CampaignStat
 
   return {
     totalTargets,
-    emailsSent: totalTargets,
+    emailsSent,
     clicked,
     submitted,
     clickRate: totalTargets > 0 ? (clicked / totalTargets) * 100 : 0,
