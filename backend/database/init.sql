@@ -447,6 +447,250 @@ INSERT INTO landing_pages (name, html, is_default) VALUES
 </body>
 </html>',
     true
+),
+(
+    'ESTÜ Canvas Giriş',
+    '<!DOCTYPE html>
+<html lang="tr" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas''ta Oturum Aç</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            height: 100%;
+            font-family: "Lato", "Helvetica Neue", Arial, sans-serif;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        body {
+            background: #394b58;
+            background-image: url("https://estuoys.eskisehir.edu.tr/accounts/1/files/11881/download?verifier=zf6pO83pq5wzqndBOuW2cNErx0iB9nYioCNQVvKf");
+            background-size: cover;
+            background-position: center bottom;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding-top: 60px;
+        }
+        .ic-Login {
+            width: 100%;
+            max-width: 360px;
+            padding: 0 20px;
+        }
+        .ic-Login__container {
+            width: 100%;
+        }
+        .ic-Login-header__logo {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        .ic-Login-header__logo img {
+            max-width: 140px;
+            height: auto;
+        }
+        .ic-Form-control {
+            margin-bottom: 16px;
+        }
+        .ic-Label {
+            display: block;
+            font-size: 13px;
+            color: #c41e3a;
+            margin-bottom: 6px;
+            font-weight: 400;
+        }
+        .ic-Input {
+            width: 100%;
+            padding: 10px 12px;
+            font-size: 14px;
+            font-family: inherit;
+            border: none;
+            border-radius: 3px;
+            background: #fff;
+            color: #333;
+            outline: none;
+            transition: box-shadow 0.2s;
+        }
+        .ic-Input:focus {
+            box-shadow: 0 0 0 2px rgba(196, 30, 58, 0.4);
+        }
+        .ic-Login__actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .ic-Login__actions-timeout {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .ic-Login__actions-timeout input[type="checkbox"] {
+            width: 14px;
+            height: 14px;
+            cursor: pointer;
+            accent-color: #c41e3a;
+        }
+        .ic-Login__actions-timeout label {
+            font-size: 12px;
+            color: rgba(255,255,255,0.7);
+            cursor: pointer;
+        }
+        .Button--login {
+            padding: 10px 28px;
+            background: #c41e3a;
+            color: #fff;
+            border: none;
+            border-radius: 3px;
+            font-size: 14px;
+            font-weight: 500;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .Button--login:hover {
+            background: #a01830;
+        }
+        .Button--login:disabled {
+            background: #888;
+            cursor: not-allowed;
+        }
+        .ic-Login__forgot {
+            width: 100%;
+            margin-top: 8px;
+        }
+        .ic-Login__link {
+            color: rgba(255,255,255,0.6);
+            text-decoration: none;
+            font-size: 12px;
+        }
+        .ic-Login__link:hover {
+            color: rgba(255,255,255,0.9);
+            text-decoration: underline;
+        }
+        .success-message {
+            display: none;
+            background: rgba(40, 167, 69, 0.95);
+            color: #fff;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            text-align: center;
+            font-size: 14px;
+        }
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #fff;
+            border-top: 2px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @media (max-width: 480px) {
+            body { padding-top: 40px; }
+            .ic-Login { max-width: 100%; }
+            .ic-Login__actions { flex-direction: column; align-items: flex-start; }
+            .Button--login { width: 100%; margin-top: 10px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="ic-Login">
+        <div class="ic-Login__container">
+            <div class="ic-Login-header__logo">
+                <img src="https://estuoys.eskisehir.edu.tr/accounts/1/files/65055/download?verifier=0Zi1Bdm08zJojGu5vp1JM0iZlHh1Qxk3OPePUd87" alt="ESTUOYS">
+            </div>
+
+            <div class="success-message" id="successMsg">
+                Giriş başarılı! Yönlendiriliyorsunuz...
+            </div>
+
+            <form id="loginForm">
+                <div class="ic-Form-control">
+                    <label class="ic-Label" for="tcno">T.C. Kimlik No</label>
+                    <input class="ic-Input" type="text" id="tcno" name="tcno" maxlength="11" required autocomplete="username">
+                </div>
+
+                <div class="ic-Form-control">
+                    <label class="ic-Label" for="password">Şifre</label>
+                    <input class="ic-Input" type="password" id="password" name="password" required autocomplete="current-password">
+                </div>
+
+                <div class="ic-Login__actions">
+                    <div class="ic-Login__actions-timeout">
+                        <input type="checkbox" id="remember_me" name="remember_me">
+                        <label for="remember_me">Oturumunuz açık kalsın</label>
+                    </div>
+                    <button type="submit" class="Button--login" id="submitBtn">Oturum Aç</button>
+                </div>
+
+                <div class="ic-Login__forgot">
+                    <a class="ic-Login__link" href="#" id="forgotLink">Şifrenizi mi Unuttunuz?</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById("loginForm").addEventListener("submit", function(e) {
+            e.preventDefault();
+            var submitBtn = document.getElementById("submitBtn");
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = ''<span class="spinner"></span>'';
+
+            setTimeout(function() {
+                document.getElementById("loginForm").style.display = "none";
+                document.getElementById("successMsg").style.display = "block";
+
+                var urlParams = new URLSearchParams(window.location.search);
+                var token = urlParams.get("token");
+                var campaignId = urlParams.get("campaign");
+
+                if (token && campaignId) {
+                    fetch("/api/events", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            type: "submitted",
+                            campaignId: campaignId,
+                            recipientToken: token
+                        })
+                    }).catch(function(err) { console.error("Tracking error:", err); });
+                }
+
+                setTimeout(function() {
+                    alert("PHISHING SIMÜLASYONU\\n\\nBu sayfa bir güvenlik testiydi!\\n\\nGirdiğiniz bilgiler kaydedilmedi, ancak gerçek bir saldırıda hesabınız ele geçirilebilirdi.\\n\\nGüvenlik İpuçları:\\n- URL adresini her zaman kontrol edin\\n- Şüpheli e-postalardaki linklere tıklamayın\\n- Kimlik bilgilerinizi paylaşmadan önce düşünün\\n\\nBu test Bilgi Güvenliği Birimi tarafından gerçekleştirilmiştir.");
+                    window.location.href = "/";
+                }, 1500);
+            }, 1200);
+        });
+
+        document.getElementById("tcno").addEventListener("input", function(e) {
+            this.value = this.value.replace(/[^0-9]/g, "");
+        });
+
+        document.getElementById("forgotLink").addEventListener("click", function(e) {
+            e.preventDefault();
+        });
+    </script>
+</body>
+</html>',
+    false
 );
 
 -- ============================================

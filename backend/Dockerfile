@@ -41,6 +41,9 @@ RUN npm ci --only=production && npm cache clean --force
 # Build edilmiş dosyaları kopyala
 COPY --from=builder /app/dist ./dist
 
+# Static dosyaları kopyala (landing page assets)
+COPY static ./static
+
 # Dosya sahipliğini değiştir
 RUN chown -R nodejs:nodejs /app
 

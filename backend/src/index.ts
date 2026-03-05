@@ -2,6 +2,8 @@ import express, { Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { config } from './config.js';
 import { testConnection, closePool } from './db/index.js';
 import {
@@ -16,7 +18,15 @@ import {
 } from './routes/index.js';
 import { closeLdapConnection } from './services/index.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const app = express();
+
+// ============================================
+// STATIC FILES (for landing page assets)
+// ============================================
+app.use('/static', express.static(path.join(__dirname, '../static')));
 
 // ============================================
 // TRACKING ROUTE (before security middleware)
