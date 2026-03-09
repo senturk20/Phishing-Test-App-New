@@ -50,9 +50,35 @@ export { getDashboardStats } from './dashboardService.js';
 export { sendEmail } from './mailService.js';
 export type { SendEmailParams } from './mailService.js';
 
+// Queue Service
+export {
+  isRedisAvailable,
+  enqueueEmailBatch,
+  getQueueStats,
+  closeQueue,
+} from './queueService.js';
+export type { EmailJobData } from './queueService.js';
+
+// Mail Worker
+export { startMailWorker, stopMailWorker } from './mailWorker.js';
+
+// Admin Service
+export {
+  getAdminByUsername,
+  getAdminById,
+  createAdmin,
+  verifyPassword,
+  seedDefaultAdminIfNeeded,
+} from './adminService.js';
+
+// Cloner Service
+export { mirrorSite, deleteCloneFolder } from './clonerService.js';
+export type { MirrorResult } from './clonerService.js';
+
 // LDAP Service
 export {
   testLdapConnection,
+  ldapHealthCheck,
   searchLdapUsers,
   syncLdapUsersToCampaign,
   getLdapUsersPreview,

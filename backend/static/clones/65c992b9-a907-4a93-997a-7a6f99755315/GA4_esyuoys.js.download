@@ -1,0 +1,18 @@
+$.ajax({
+  url: 'https://www.googletagmanager.com/gtag/js?id=G-3M8YBB484V',
+  dataType: 'script',
+  cache: true,
+  })
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+function ga4CourseDimensions(course) {
+    gtag('set', 'course', course['id']);
+    gtag('set', 'course_code', course['course_code']);
+    gtag('set', 'account_id', course['account_id']);
+    gtag('set', 'role', course['enrollments'][0]['type']);
+    return
+}
+gtag('config', 'G-LR76K2XVTS');
+

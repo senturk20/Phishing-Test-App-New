@@ -4,6 +4,31 @@ import type { Campaign, CampaignStats } from '../types/index.js';
 import { getRecipientsByCampaign, updateRecipientStatus } from './recipientService.js';
 import { getEmailTemplate, getEmailTemplates } from './templateService.js';
 import { sendEmail } from './mailService.js';
+import { isRedisAvailable, enqueueEmailBatch } from './queueService.js';
+import type { EmailJobData } from './queueService.js';
+
+// ============================================
+// PLACEHOLDER HELPER
+// ============================================
+
+function replacePlaceholders(
+  text: string,
+  recipient: { firstName: string; lastName: string; email: string },
+  trackingLink: string,
+  phishDomain: string
+): string {
+  const fullName = [recipient.firstName, recipient.lastName].filter(Boolean).join(' ');
+  return text
+    .replace(/\{\{firstName\}\}/g, recipient.firstName || '')
+    .replace(/\{\{lastName\}\}/g, recipient.lastName || '')
+    .replace(/\{\{name\}\}/g, fullName)
+    .replace(/\{\{trackingLink\}\}/g, trackingLink)
+    .replace(/\{\{link\}\}/g, trackingLink)
+    .replace(/\{\{email\}\}/g, recipient.email)
+    .replace(/\{\{phish_domain\}\}/g, phishDomain)
+    .replace(/\{\{department\}\}/g, '')
+    .replace(/\{\{date\}\}/g, new Date().toLocaleDateString('tr-TR'));
+}
 
 // ============================================
 // GET CAMPAIGNS
@@ -471,39 +496,57 @@ export async function startCampaign(id: string): Promise<Campaign | null> {
 
   // --- Dispatch emails to all recipients ---
   const recipients = await getRecipientsByCampaign(id);
-  let sentCount = 0;
+  const phishDomain = campaign.phishDomain || 'secure-login.com';
+  const useQueue = await isRedisAvailable();
 
-  for (const recipient of recipients) {
-    try {
+  if (useQueue) {
+    // --- Queue mode: enqueue all jobs in a single batch ---
+    const jobs: EmailJobData[] = recipients.map((recipient) => {
       const trackingLink = `${trackingBase}/t/${recipient.token}`;
+      return {
+        recipientToken: recipient.token,
+        recipientEmail: recipient.email,
+        subject: replacePlaceholders(templateSubject, recipient, trackingLink, phishDomain),
+        html: replacePlaceholders(templateBody, recipient, trackingLink, phishDomain),
+        campaignId: campaign.id,
+        campaignName: campaign.name,
+      };
+    });
 
-      // Replace placeholders in the template
-      const html = templateBody
-        .replace(/\{\{firstName\}\}/g, recipient.firstName || '')
-        .replace(/\{\{lastName\}\}/g, recipient.lastName || '')
-        .replace(/\{\{trackingLink\}\}/g, trackingLink)
-        .replace(/\{\{email\}\}/g, recipient.email);
+    await enqueueEmailBatch(jobs);
+    console.log(`Campaign "${campaign.name}": ${jobs.length} emails enqueued`);
+  } else {
+    // --- Direct mode: fire-and-forget with event-loop yielding ---
+    // Send emails in background so the HTTP response returns immediately
+    // and the event loop stays free for health checks / dashboard requests.
+    const campaignName = campaign.name;
+    const totalRecipients = recipients.length;
 
-      const subject = templateSubject
-        .replace(/\{\{firstName\}\}/g, recipient.firstName || '')
-        .replace(/\{\{lastName\}\}/g, recipient.lastName || '');
+    setImmediate(async () => {
+      let sentCount = 0;
+      for (const recipient of recipients) {
+        try {
+          const trackingLink = `${trackingBase}/t/${recipient.token}`;
+          const html = replacePlaceholders(templateBody, recipient, trackingLink, phishDomain);
+          const subject = replacePlaceholders(templateSubject, recipient, trackingLink, phishDomain);
 
-      const success = await sendEmail({
-        to: recipient.email,
-        subject,
-        html,
-      });
-
-      if (success) {
-        await updateRecipientStatus(recipient.token, 'sent');
-        sentCount++;
+          const success = await sendEmail({ to: recipient.email, subject, html });
+          if (success) {
+            await updateRecipientStatus(recipient.token, 'sent');
+            sentCount++;
+          }
+        } catch (error) {
+          console.error(`Failed to send email to ${recipient.email}:`, error);
+        }
+        // Yield the event loop between each email so health checks / API
+        // requests can be processed in between sends.
+        await new Promise<void>((resolve) => setImmediate(resolve));
       }
-    } catch (error) {
-      console.error(`Failed to send email to ${recipient.email}:`, error);
-    }
-  }
+      console.log(`Campaign "${campaignName}": ${sentCount}/${totalRecipients} emails sent (direct mode)`);
+    });
 
-  console.log(`Campaign "${campaign.name}": ${sentCount}/${recipients.length} emails sent`);
+    console.log(`Campaign "${campaign.name}": ${recipients.length} emails dispatched in background (direct mode)`);
+  }
 
   return campaign;
 }

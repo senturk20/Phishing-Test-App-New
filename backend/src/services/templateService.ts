@@ -17,7 +17,7 @@ export async function getEmailTemplates(): Promise<EmailTemplate[]> {
   if (!p) return [];
 
   const result = await p.query(
-    `SELECT id, name, subject, body, is_default, created_at, updated_at
+    `SELECT id, name, subject, body, category, is_default, created_at, updated_at
      FROM email_templates ORDER BY created_at DESC`
   );
 
@@ -26,6 +26,7 @@ export async function getEmailTemplates(): Promise<EmailTemplate[]> {
     name: row.name,
     subject: row.subject,
     body: row.body,
+    category: row.category || 'general',
     isDefault: row.is_default,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -45,7 +46,7 @@ export async function getEmailTemplate(id: string): Promise<EmailTemplate | null
   if (!p) return null;
 
   const result = await p.query(
-    `SELECT id, name, subject, body, is_default, created_at, updated_at
+    `SELECT id, name, subject, body, category, is_default, created_at, updated_at
      FROM email_templates WHERE id = $1`,
     [id]
   );
@@ -58,6 +59,7 @@ export async function getEmailTemplate(id: string): Promise<EmailTemplate | null
     name: row.name,
     subject: row.subject,
     body: row.body,
+    category: row.category || 'general',
     isDefault: row.is_default,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -72,6 +74,7 @@ export async function createEmailTemplate(data: {
   name: string;
   subject: string;
   body: string;
+  category?: string;
   isDefault?: boolean;
 }): Promise<EmailTemplate> {
   const now = new Date();
@@ -86,6 +89,7 @@ export async function createEmailTemplate(data: {
       name: data.name,
       subject: data.subject,
       body: data.body,
+      category: data.category || 'general',
       isDefault: data.isDefault || false,
       createdAt: now,
       updatedAt: now,
@@ -103,10 +107,10 @@ export async function createEmailTemplate(data: {
   }
 
   const result = await p.query(
-    `INSERT INTO email_templates (name, subject, body, is_default)
-     VALUES ($1, $2, $3, $4)
-     RETURNING id, name, subject, body, is_default, created_at, updated_at`,
-    [data.name, data.subject, data.body, data.isDefault || false]
+    `INSERT INTO email_templates (name, subject, body, category, is_default)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING id, name, subject, body, category, is_default, created_at, updated_at`,
+    [data.name, data.subject, data.body, data.category || 'general', data.isDefault || false]
   );
 
   const row = result.rows[0];
@@ -117,6 +121,7 @@ export async function createEmailTemplate(data: {
     name: row.name,
     subject: row.subject,
     body: row.body,
+    category: row.category || 'general',
     isDefault: row.is_default,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -129,7 +134,7 @@ export async function createEmailTemplate(data: {
 
 export async function updateEmailTemplate(
   id: string,
-  data: { name?: string; subject?: string; body?: string; isDefault?: boolean }
+  data: { name?: string; subject?: string; body?: string; category?: string; isDefault?: boolean }
 ): Promise<EmailTemplate | null> {
   if (config.useMemoryDb) {
     const template = memoryStore.emailTemplates.find((t) => t.id === id);
@@ -142,6 +147,7 @@ export async function updateEmailTemplate(
     if (data.name !== undefined) template.name = data.name;
     if (data.subject !== undefined) template.subject = data.subject;
     if (data.body !== undefined) template.body = data.body;
+    if (data.category !== undefined) template.category = data.category;
     if (data.isDefault !== undefined) template.isDefault = data.isDefault;
     template.updatedAt = new Date();
     return template;
@@ -170,6 +176,10 @@ export async function updateEmailTemplate(
     updates.push(`body = $${paramIndex++}`);
     values.push(data.body);
   }
+  if (data.category !== undefined) {
+    updates.push(`category = $${paramIndex++}`);
+    values.push(data.category);
+  }
   if (data.isDefault !== undefined) {
     updates.push(`is_default = $${paramIndex++}`);
     values.push(data.isDefault);
@@ -183,7 +193,7 @@ export async function updateEmailTemplate(
   const result = await p.query(
     `UPDATE email_templates SET ${updates.join(', ')}
      WHERE id = $${paramIndex}
-     RETURNING id, name, subject, body, is_default, created_at, updated_at`,
+     RETURNING id, name, subject, body, category, is_default, created_at, updated_at`,
     values
   );
 
@@ -195,6 +205,7 @@ export async function updateEmailTemplate(
     name: row.name,
     subject: row.subject,
     body: row.body,
+    category: row.category || 'general',
     isDefault: row.is_default,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

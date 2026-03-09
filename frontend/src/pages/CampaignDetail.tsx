@@ -1,7 +1,38 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import {
+  Card,
+  Group,
+  Text,
+  Title,
+  SimpleGrid,
+  Table,
+  Badge,
+  Button,
+  Stack,
+  Center,
+  Loader,
+  Alert,
+  ThemeIcon,
+} from '@mantine/core';
+import { notifications } from '@mantine/notifications';
+import {
+  ArrowLeft,
+  Play,
+  Pause,
+  CheckCircle,
+  RotateCw,
+  Users,
+  Send,
+  MousePointerClick,
+  FileWarning,
+  RefreshCw,
+  AlertTriangle,
+} from 'lucide-react';
 import { api } from '../api';
 import type { CampaignDetail as CampaignDetailType, Recipient, LdapSyncResult } from '../types';
+import { campaignStatusMap, recipientStatusMap, eventTypeMap } from '../utils/statusHelpers';
+import dayjs from 'dayjs';
 
 export function CampaignDetail() {
   const { id } = useParams<{ id: string }>();
@@ -40,7 +71,6 @@ export function CampaignDetail() {
     fetchRecipients();
   }, [id]);
 
-  // --- LDAP Sync ---
   const handleSync = async () => {
     if (!id) return;
     setSyncLoading(true);
@@ -49,266 +79,273 @@ export function CampaignDetail() {
     try {
       const result = await api.syncLdapUsers(id);
       setSyncResult(result);
+      notifications.show({
+        title: 'LDAP Senkronizasyonu',
+        message: `${result.synced} eklendi, ${result.skipped} atlandi`,
+        color: result.errors > 0 ? 'yellow' : 'cyberGreen',
+      });
       await fetchRecipients();
       await fetchCampaign();
     } catch {
       setError('LDAP senkronizasyonu basarisiz oldu');
+      notifications.show({ title: 'Hata', message: 'LDAP senkronizasyonu basarisiz', color: 'alertRed' });
     } finally {
       setSyncLoading(false);
     }
   };
 
-  // --- Campaign Actions ---
-  const handleStart = async () => {
+  const handleAction = async (action: 'start' | 'pause' | 'resume' | 'complete') => {
     if (!id) return;
-    if (recipients.length === 0) {
+    if (action === 'start' && recipients.length === 0) {
       setError('Kampanyayi baslatmadan once alici eklemelisiniz (LDAP Senkronize)');
       return;
     }
     setActionLoading(true);
     setError(null);
+    const labels: Record<string, string> = {
+      start: 'baslatildi', pause: 'duraklatildi', resume: 'devam ettiriliyor', complete: 'tamamlandi',
+    };
+    const errorLabels: Record<string, string> = {
+      start: 'baslatilamadi', pause: 'duraklattilamadi', resume: 'devam ettirilemedi', complete: 'tamamlanamadi',
+    };
     try {
-      await api.startCampaign(id);
+      if (action === 'start') await api.startCampaign(id);
+      else if (action === 'pause') await api.pauseCampaign(id);
+      else if (action === 'resume') await api.resumeCampaign(id);
+      else await api.completeCampaign(id);
+      notifications.show({ title: 'Basarili', message: `Kampanya ${labels[action]}`, color: 'cyberGreen' });
       await fetchCampaign();
-      await fetchRecipients();
+      if (action === 'start') await fetchRecipients();
     } catch {
-      setError('Kampanya baslatilamadi');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handlePause = async () => {
-    if (!id) return;
-    setActionLoading(true);
-    try {
-      await api.pauseCampaign(id);
-      await fetchCampaign();
-    } catch {
-      setError('Kampanya duraklattilamadi');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleResume = async () => {
-    if (!id) return;
-    setActionLoading(true);
-    try {
-      await api.resumeCampaign(id);
-      await fetchCampaign();
-    } catch {
-      setError('Kampanya devam ettirilemedi');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleComplete = async () => {
-    if (!id) return;
-    setActionLoading(true);
-    try {
-      await api.completeCampaign(id);
-      await fetchCampaign();
-    } catch {
-      setError('Kampanya tamamlanamadi');
+      setError(`Kampanya ${errorLabels[action]}`);
+      notifications.show({ title: 'Hata', message: `Kampanya ${errorLabels[action]}`, color: 'alertRed' });
     } finally {
       setActionLoading(false);
     }
   };
 
   if (loading) {
-    return <div className="loading">Yukleniyor...</div>;
+    return <Center h={400}><Loader color="electricBlue" size="lg" /></Center>;
   }
 
   if (!campaign) {
     return (
-      <div className="error-page">
-        <h2>Hata</h2>
-        <p>{error || 'Kampanya bulunamadi'}</p>
-        <Link to="/campaigns" className="btn">Geri Don</Link>
-      </div>
+      <Center h={400}>
+        <Stack align="center" gap="sm">
+          <Text c="dimmed" size="lg">{error || 'Kampanya bulunamadi'}</Text>
+          <Button component={Link} to="/campaigns" color="electricBlue">Geri Don</Button>
+        </Stack>
+      </Center>
     );
   }
 
   const { stats } = campaign;
+  const sm = campaignStatusMap[campaign.status];
 
   return (
-    <div className="campaign-detail">
-      <div className="page-header">
+    <Stack gap="lg">
+      {/* Header */}
+      <Group justify="space-between" align="flex-start">
         <div>
-          <Link to="/campaigns" className="back-link">&larr; Kampanyalar</Link>
-          <h2>{campaign.name}</h2>
-          <p className="text-muted">{campaign.description}</p>
+          <Button
+            component={Link}
+            to="/campaigns"
+            variant="subtle"
+            color="electricBlue"
+            leftSection={<ArrowLeft size={14} />}
+            size="xs"
+            mb="xs"
+            px={0}
+          >
+            Kampanyalar
+          </Button>
+          <Title order={2} c="white">{campaign.name}</Title>
+          {campaign.description && <Text size="sm" c="dimmed">{campaign.description}</Text>}
         </div>
-        <div className="action-buttons">
+        <Group gap="sm">
           {campaign.status === 'draft' && (
-            <button className="btn btn-primary" onClick={handleStart} disabled={actionLoading}>
-              {actionLoading ? 'Baslatiliyor...' : 'Kampanyayi Baslat'}
-            </button>
+            <Button
+              color="cyberGreen"
+              leftSection={<Play size={16} />}
+              onClick={() => handleAction('start')}
+              loading={actionLoading}
+            >
+              Kampanyayi Baslat
+            </Button>
           )}
           {campaign.status === 'active' && (
             <>
-              <button className="btn btn-secondary" onClick={handlePause} disabled={actionLoading}>
-                {actionLoading ? 'Isleniyor...' : 'Duraktat'}
-              </button>
-              <button className="btn btn-primary" onClick={handleComplete} disabled={actionLoading}>
+              <Button variant="light" color="yellow" leftSection={<Pause size={16} />} onClick={() => handleAction('pause')} loading={actionLoading}>
+                Duraktat
+              </Button>
+              <Button color="cyberGreen" leftSection={<CheckCircle size={16} />} onClick={() => handleAction('complete')} loading={actionLoading}>
                 Tamamla
-              </button>
+              </Button>
             </>
           )}
           {campaign.status === 'paused' && (
             <>
-              <button className="btn btn-primary" onClick={handleResume} disabled={actionLoading}>
-                {actionLoading ? 'Isleniyor...' : 'Devam Et'}
-              </button>
-              <button className="btn btn-secondary" onClick={handleComplete} disabled={actionLoading}>
+              <Button color="electricBlue" leftSection={<RotateCw size={16} />} onClick={() => handleAction('resume')} loading={actionLoading}>
+                Devam Et
+              </Button>
+              <Button variant="light" color="gray" leftSection={<CheckCircle size={16} />} onClick={() => handleAction('complete')} loading={actionLoading}>
                 Tamamla
-              </button>
+              </Button>
             </>
           )}
-        </div>
-      </div>
+        </Group>
+      </Group>
 
-      {error && <div className="alert alert-error">{error}</div>}
+      {error && <Alert color="alertRed" icon={<AlertTriangle size={16} />}>{error}</Alert>}
 
       {/* Campaign Meta */}
-      <div className="campaign-meta">
-        <span className={`badge badge-${campaign.status}`}>
-          {campaign.status === 'draft' && 'Taslak'}
-          {campaign.status === 'active' && 'Aktif'}
-          {campaign.status === 'completed' && 'Tamamlandi'}
-          {campaign.status === 'paused' && 'Duraklatildi'}
-        </span>
-        <span>Sablon: {campaign.templateMode === 'specific' ? 'Belirli' : 'Rastgele'}</span>
-        <span>Domain: {campaign.phishDomain || '-'}</span>
-        <span>Olusturulma: {new Date(campaign.createdAt).toLocaleString('tr-TR')}</span>
-      </div>
+      <Group gap="md">
+        <Badge color={sm.color} variant="light" size="lg">{sm.label}</Badge>
+        <Text size="sm" c="dimmed">Sablon: {campaign.templateMode === 'specific' ? 'Belirli' : 'Rastgele'}</Text>
+        <Text size="sm" c="dimmed">Domain: {campaign.phishDomain || '-'}</Text>
+        <Text size="sm" c="dimmed">Olusturulma: {dayjs(campaign.createdAt).format('DD.MM.YYYY HH:mm')}</Text>
+      </Group>
 
       {/* Stats Grid */}
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-value">{stats.totalTargets}</div>
-          <div className="stat-label">Toplam Hedef</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">{stats.emailsSent}</div>
-          <div className="stat-label">Gonderilen E-posta</div>
-        </div>
-        <div className="stat-card highlight-warning">
-          <div className="stat-value">{stats.clicked}</div>
-          <div className="stat-label">Tiklama ({stats.clickRate.toFixed(1)}%)</div>
-        </div>
-        <div className="stat-card highlight-danger">
-          <div className="stat-value">{stats.submitted}</div>
-          <div className="stat-label">Form Gonderimi ({stats.submitRate.toFixed(1)}%)</div>
-        </div>
-      </div>
+      <SimpleGrid cols={{ base: 1, xs: 2, md: 4 }}>
+        <Card>
+          <Group justify="space-between" align="flex-start">
+            <div>
+              <Text size="xs" tt="uppercase" fw={600} c="dimmed">Toplam Hedef</Text>
+              <Text size="xl" fw={700} c="white" mt={4}>{stats.totalTargets}</Text>
+            </div>
+            <ThemeIcon variant="light" color="electricBlue" size="lg" radius="md"><Users size={18} /></ThemeIcon>
+          </Group>
+        </Card>
+        <Card>
+          <Group justify="space-between" align="flex-start">
+            <div>
+              <Text size="xs" tt="uppercase" fw={600} c="dimmed">Gonderilen E-posta</Text>
+              <Text size="xl" fw={700} c="white" mt={4}>{stats.emailsSent}</Text>
+            </div>
+            <ThemeIcon variant="light" color="cyberGreen" size="lg" radius="md"><Send size={18} /></ThemeIcon>
+          </Group>
+        </Card>
+        <Card>
+          <Group justify="space-between" align="flex-start">
+            <div>
+              <Text size="xs" tt="uppercase" fw={600} c="dimmed">Tiklama</Text>
+              <Text size="xl" fw={700} c="white" mt={4}>{stats.clicked}</Text>
+              <Text size="xs" c="dimmed">{stats.clickRate.toFixed(1)}%</Text>
+            </div>
+            <ThemeIcon variant="light" color="yellow" size="lg" radius="md"><MousePointerClick size={18} /></ThemeIcon>
+          </Group>
+        </Card>
+        <Card>
+          <Group justify="space-between" align="flex-start">
+            <div>
+              <Text size="xs" tt="uppercase" fw={600} c="dimmed">Form Gonderimi</Text>
+              <Text size="xl" fw={700} c="white" mt={4}>{stats.submitted}</Text>
+              <Text size="xs" c="dimmed">{stats.submitRate.toFixed(1)}%</Text>
+            </div>
+            <ThemeIcon variant="light" color="alertRed" size="lg" radius="md"><FileWarning size={18} /></ThemeIcon>
+          </Group>
+        </Card>
+      </SimpleGrid>
 
-      {/* Recipients Section with LDAP Sync */}
-      <div className="section">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h3>Alicilar ({recipients.length})</h3>
+      {/* Recipients */}
+      <Card>
+        <Group justify="space-between" mb="md">
+          <Text fw={600} c="white">Alicilar ({recipients.length})</Text>
           {campaign.status === 'draft' && (
-            <button
-              className="btn btn-primary"
+            <Button
+              color="electricBlue"
+              leftSection={<RefreshCw size={16} />}
               onClick={handleSync}
-              disabled={syncLoading}
+              loading={syncLoading}
+              size="sm"
             >
-              {syncLoading ? 'Senkronize ediliyor...' : 'LDAP Senkronize Et'}
-            </button>
+              LDAP Senkronize Et
+            </Button>
           )}
-        </div>
+        </Group>
 
-        {/* Sync Result Banner */}
         {syncResult && (
-          <div className="alert" style={{
-            background: syncResult.errors > 0 ? '#fff3cd' : '#d4edda',
-            border: `1px solid ${syncResult.errors > 0 ? '#ffc107' : '#28a745'}`,
-            color: '#333',
-            padding: '12px 16px',
-            borderRadius: '4px',
-            marginBottom: '1rem',
-          }}>
+          <Alert color={syncResult.errors > 0 ? 'yellow' : 'cyberGreen'} mb="md" variant="light">
             LDAP Senkronizasyonu: {syncResult.synced} eklendi, {syncResult.skipped} atlandi, {syncResult.errors} hata
-          </div>
+          </Alert>
         )}
 
         {recipients.length === 0 ? (
-          <div className="empty-state" style={{ padding: '2rem', textAlign: 'center', background: '#f8f9fa', borderRadius: '8px' }}>
-            <p style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>Henuz alici eklenmemis.</p>
-            {campaign.status === 'draft' && (
-              <p style={{ color: '#666' }}>
-                Kampanyayi baslatmadan once "LDAP Senkronize Et" butonuna tiklayarak
-                LDAP dizininden alicilari iceri aktarin.
-              </p>
-            )}
-          </div>
+          <Center py="xl">
+            <Stack align="center" gap="sm">
+              <Text c="dimmed">Henuz alici eklenmemis.</Text>
+              {campaign.status === 'draft' && (
+                <Text size="sm" c="dimmed">
+                  "LDAP Senkronize Et" butonuna tiklayarak LDAP dizininden alicilari iceri aktarin.
+                </Text>
+              )}
+            </Stack>
+          </Center>
         ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>E-posta</th>
-                <th>Ad</th>
-                <th>Soyad</th>
-                <th>Durum</th>
-                <th>Gonderim Zamani</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recipients.map(r => (
-                <tr key={r.id}>
-                  <td>{r.email}</td>
-                  <td>{r.firstName}</td>
-                  <td>{r.lastName}</td>
-                  <td>
-                    <span className={`badge badge-${r.status}`}>
-                      {r.status === 'pending' && 'Bekliyor'}
-                      {r.status === 'sent' && 'Gonderildi'}
-                      {r.status === 'clicked' && 'Tikladi'}
-                      {r.status === 'submitted' && 'Form Gonderdi'}
-                      {r.status === 'failed' && 'Basarisiz'}
-                    </span>
-                  </td>
-                  <td>{r.sentAt ? new Date(r.sentAt).toLocaleString('tr-TR') : '-'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <Table highlightOnHover>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>E-posta</Table.Th>
+                <Table.Th>Ad</Table.Th>
+                <Table.Th>Soyad</Table.Th>
+                <Table.Th>Durum</Table.Th>
+                <Table.Th>Gonderim Zamani</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {recipients.map(r => {
+                const rs = recipientStatusMap[r.status];
+                return (
+                  <Table.Tr key={r.id}>
+                    <Table.Td><Text size="sm">{r.email}</Text></Table.Td>
+                    <Table.Td><Text size="sm" c="dimmed">{r.firstName}</Text></Table.Td>
+                    <Table.Td><Text size="sm" c="dimmed">{r.lastName}</Text></Table.Td>
+                    <Table.Td><Badge color={rs.color} variant="light" size="sm">{rs.label}</Badge></Table.Td>
+                    <Table.Td>
+                      <Text size="sm" c="dimmed">
+                        {r.sentAt ? dayjs(r.sentAt).format('DD.MM.YYYY HH:mm') : '-'}
+                      </Text>
+                    </Table.Td>
+                  </Table.Tr>
+                );
+              })}
+            </Table.Tbody>
+          </Table>
         )}
-      </div>
+      </Card>
 
       {/* Event History */}
-      <div className="section">
-        <h3>Etkinlik Gecmisi</h3>
+      <Card>
+        <Text fw={600} c="white" mb="md">Etkinlik Gecmisi</Text>
         {campaign.events.length === 0 ? (
-          <p className="empty-state">Henuz etkinlik kaydedilmemis.</p>
+          <Center py="lg"><Text c="dimmed">Henuz etkinlik kaydedilmemis.</Text></Center>
         ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Zaman</th>
-                <th>Tur</th>
-                <th>Alici Token</th>
-              </tr>
-            </thead>
-            <tbody>
-              {campaign.events.map(event => (
-                <tr key={event.id}>
-                  <td>{new Date(event.createdAt).toLocaleString('tr-TR')}</td>
-                  <td>
-                    <span className={`badge badge-${event.type}`}>
-                      {event.type === 'clicked' && 'Tiklandi'}
-                      {event.type === 'submitted' && 'Gonderildi'}
-                    </span>
-                  </td>
-                  <td className="text-mono">{event.recipientToken}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <Table highlightOnHover>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>Zaman</Table.Th>
+                <Table.Th>Tur</Table.Th>
+                <Table.Th>Alici Token</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {campaign.events.map(event => {
+                const et = eventTypeMap[event.type];
+                return (
+                  <Table.Tr key={event.id}>
+                    <Table.Td>
+                      <Text size="sm" c="dimmed">{dayjs(event.createdAt).format('DD.MM.YYYY HH:mm:ss')}</Text>
+                    </Table.Td>
+                    <Table.Td><Badge color={et.color} variant="light" size="sm">{et.label}</Badge></Table.Td>
+                    <Table.Td><Text size="sm" ff="monospace" c="dimmed">{event.recipientToken}</Text></Table.Td>
+                  </Table.Tr>
+                );
+              })}
+            </Table.Tbody>
+          </Table>
         )}
-      </div>
-    </div>
+      </Card>
+    </Stack>
   );
 }

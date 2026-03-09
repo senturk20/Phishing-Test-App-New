@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS email_templates (
     name VARCHAR(255) NOT NULL,
     subject VARCHAR(500) NOT NULL,
     body TEXT NOT NULL,
+    category VARCHAR(50) DEFAULT 'general',
     is_default BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -22,7 +23,10 @@ CREATE TABLE IF NOT EXISTS email_templates (
 CREATE TABLE IF NOT EXISTS landing_pages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) UNIQUE,
     html TEXT NOT NULL,
+    original_url TEXT DEFAULT '',
+    is_cloned BOOLEAN DEFAULT false,
     is_default BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -108,7 +112,7 @@ CREATE TABLE IF NOT EXISTS recipients (
 -- ============================================
 -- SAMPLE DATA - EMAIL TEMPLATES
 -- ============================================
-INSERT INTO email_templates (name, subject, body, is_default) VALUES
+INSERT INTO email_templates (name, subject, body, category, is_default) VALUES
 (
     'IT - Şifre Sıfırlama',
     'Acil: Şifrenizi Sıfırlayın',
@@ -117,6 +121,7 @@ INSERT INTO email_templates (name, subject, body, is_default) VALUES
     <p>Lütfen <a href="{{trackingLink}}">buraya tıklayarak</a> şifrenizi 24 saat içinde güncelleyin.</p>
     <p>Bu işlemi yapmazsanız hesabınız geçici olarak askıya alınacaktır.</p>
     <p>Saygılarımızla,<br>IT Departmanı</p>',
+    'it',
     true
 ),
 (
@@ -127,6 +132,7 @@ INSERT INTO email_templates (name, subject, body, is_default) VALUES
     <p><a href="{{trackingLink}}">Belgeyi görüntülemek için tıklayın</a></p>
     <p>Son onay tarihi: 3 gün</p>
     <p>İK Departmanı</p>',
+    'hr',
     false
 ),
 (
@@ -137,6 +143,7 @@ INSERT INTO email_templates (name, subject, body, is_default) VALUES
     <p><a href="{{trackingLink}}">Ödeme detaylarını görüntüle</a></p>
     <p>Tutarı kontrol edip onaylamanız gerekmektedir.</p>
     <p>Finans Departmanı</p>',
+    'finance',
     false
 ),
 (
@@ -147,6 +154,7 @@ INSERT INTO email_templates (name, subject, body, is_default) VALUES
     <p>Siz değilseniz, <a href="{{trackingLink}}">hemen güvenlik kontrolü yapın</a>.</p>
     <p>Lokasyon: Bilinmeyen<br>Cihaz: Bilinmeyen</p>
     <p>Güvenlik Ekibi</p>',
+    'general',
     false
 ),
 (
@@ -157,6 +165,7 @@ INSERT INTO email_templates (name, subject, body, is_default) VALUES
     <p><a href="{{trackingLink}}">Güncellemeyi indirmek için tıklayın</a></p>
     <p>Eski sürüm 1 hafta sonra devre dışı kalacaktır.</p>
     <p>IT Destek Ekibi</p>',
+    'it',
     false
 );
 
@@ -691,6 +700,18 @@ INSERT INTO landing_pages (name, html, is_default) VALUES
 </body>
 </html>',
     false
+);
+
+-- ============================================
+-- ADMINS TABLE
+-- ============================================
+CREATE TABLE IF NOT EXISTS admins (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    username VARCHAR(100) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    role VARCHAR(50) DEFAULT 'admin',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- ============================================

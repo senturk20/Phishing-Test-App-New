@@ -65,6 +65,25 @@ services:
     networks:
       - app-network
 
+  # Redis (BullMQ Job Queue)
+  redis:
+    image: redis:7-alpine
+    container_name: phishing-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy noeviction
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - app-network
+
   # MailHog (SMTP test server)
   mailhog:
     image: mailhog/mailhog:latest
@@ -88,13 +107,19 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=8080
-      - CORS_ORIGIN=http://localhost,http://localhost:80,http://localhost:5173
+      - CORS_ORIGIN=http://localhost,http://localhost:80,http://localhost:3000,http://localhost:5173
       - DATABASE_URL=postgresql://${POSTGRES_USER:-phishing}:${POSTGRES_PASSWORD:-phishing_secret}@postgres:5432/${POSTGRES_DB:-phishing_db}
       # Tracking URL base (phishing links in emails point here)
       - TRACKING_BASE_URL=http://localhost
       # SMTP Configuration (MailHog)
       - SMTP_HOST=mailhog
       - SMTP_PORT=1025
+      # JWT Configuration
+      - JWT_SECRET=${JWT_SECRET:-super-secret-jwt-key-change-in-production}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-24h}
+      # Redis Configuration (BullMQ)
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
       # LDAP Configuration
       - LDAP_URL=ldap://ldap:389
       - LDAP_ADMIN_DN=cn=admin,dc=university,dc=edu,dc=tr
@@ -102,8 +127,19 @@ services:
       - LDAP_BASE_DN=dc=university,dc=edu,dc=tr
       - LDAP_USERS_OU=ou=users
       - LDAP_USER_FILTER=(objectClass=inetOrgPerson)
+      # LDAP Attribute Mapping (change these for Active Directory or custom schemas)
+      # For AD: LDAP_ATTR_USERNAME=sAMAccountName
+      - LDAP_ATTR_EMAIL=mail
+      - LDAP_ATTR_FIRSTNAME=givenName
+      - LDAP_ATTR_LASTNAME=sn
+      - LDAP_ATTR_USERNAME=uid
+      - LDAP_ATTR_FULLNAME=cn
+    volumes:
+      - ./backend/static/clones:/app/static/clones
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       ldap:
         condition: service_started
@@ -118,26 +154,31 @@ services:
     networks:
       - app-network
 
-  # Frontend (Nginx + React)
+  # Frontend (Vite Dev Server)
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile.production
+      dockerfile: Dockerfile.dev
     container_name: phishing-frontend
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "80:3000"
     environment:
-      - BACKEND_URL=backend:8080
+      - VITE_API_BASE_URL=/api
+      - CHOKIDAR_USEPOLLING=true
+      - NODE_OPTIONS=--max-old-space-size=2048
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
     depends_on:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 30s
     networks:
       - app-network
 
@@ -149,3 +190,4 @@ volumes:
   postgres_data:
   ldap_data:
   ldap_config:
+  redis_data:

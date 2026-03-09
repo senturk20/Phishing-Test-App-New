@@ -82,6 +82,7 @@ export interface EmailTemplate {
   name: string;
   subject: string;
   body: string;
+  category: string;
   isDefault: boolean;
   createdAt: string;
   updatedAt: string;
@@ -90,7 +91,10 @@ export interface EmailTemplate {
 export interface LandingPage {
   id: string;
   name: string;
+  slug: string;
   html: string;
+  originalUrl: string;
+  isCloned: boolean;
   isDefault: boolean;
   createdAt: string;
   updatedAt: string;

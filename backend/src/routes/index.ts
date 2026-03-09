@@ -6,3 +6,7 @@ export { default as eventRoutes } from './eventRoutes.js';
 export { default as dashboardRoutes } from './dashboardRoutes.js';
 export { default as ldapRoutes } from './ldapRoutes.js';
 export { default as trackingRoutes } from './trackingRoutes.js';
+export { default as queueRoutes } from './queueRoutes.js';
+export { default as authRoutes } from './authRoutes.js';
+export { default as clonerRoutes } from './clonerRoutes.js';
+export { default as phishingRoutes } from './phishingRoutes.js';

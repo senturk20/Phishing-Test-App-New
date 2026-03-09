@@ -1,0 +1,203 @@
+html {
+    font-size: 18px;
+}
+
+body {
+    padding: 0;
+    margin: 0;
+    font-family: quicksand, sans-serif;
+}
+
+.header {
+    width: 100%;
+    min-height: 10vh;
+    display: flex;
+    box-sizing: border-box;
+    background-image: -moz-linear-gradient(45deg, #FEFEFE 0%, #CCCCCC 100%);
+    background-image: -webkit-linear-gradient(45deg, #FEFEFE 0%, #CCCCCC 100%);
+    background-image: -ms-linear-gradient(45deg, #FEFEFE 0%, #CCCCCC 100%);
+    padding: 55px 0;
+    position: relative;
+    align-items: center;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.header .logo {
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    color: #000000;
+}
+
+.header .logo .icon {
+    margin-bottom: 0.3rem;
+}
+
+.header .logo .text {
+    margin-bottom: 1.5rem;
+}
+
+.header .logo .application-name {
+    font-size: 1.125rem;
+    font-weight: 700;
+}
+
+.header .note {
+    opacity: 0.5;
+    font-size: 0.8rem;
+    color: #000;
+}
+
+.header::after {
+    content: "";
+    width: 690px;
+    height: 4px;
+    position: absolute;
+    left: 50%;
+    bottom: -2px;
+    transform: translateX(-50%);
+    background: #4E4E4E;
+    border-radius: 4px;
+}
+
+.main {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    margin-bottom: 4.75rem;
+    font-size: 16px;
+}
+
+.main .container {
+    width: 1230px;
+    padding: 0 -30px;
+}
+
+.main {
+    margin: 3rem 0 0 0;
+    display: flex;
+}
+
+.main .content {
+    width: 66%;
+    color: #525151;
+    line-height: 1.75rem;
+}
+
+.main .content ul li {
+    list-style: circle;
+}
+
+.main .content ul li a {
+    color: #333;
+}
+
+.main .content p {
+    margin-block-start: 0;
+}
+
+.btn {
+    background: #bd202e;
+    border: none;
+}
+
+.btn-edevlet {
+    background: #338ad6;
+    background: -o-linear-gradient(330deg, #338ad6 0, #045ead 80%);
+    background: linear-gradient(120deg, #338ad6 0, #045ead 80%);
+    color: #FFF;
+    border: none;
+}
+
+.form-label, .form-control {
+    font-size: 0.875rem;
+}
+.footer {
+    width: 100%;
+    text-align: center;
+    color: #bbb;
+    font-size: 0.8rem;
+    margin-bottom: 20px;
+    line-height: 20px;
+    position: fixed;
+    left: 0;
+    bottom: 0;
+}
+
+.alert {
+    padding: 15px;
+    margin-bottom: 20px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+}
+
+.alert-danger {
+    color: #a94442;
+    background-color: #f2dede;
+    border-color: #ebccd1;
+}
+
+@media (max-width: 1920px) {
+    html {
+        font-size: 17px;
+    }
+}
+
+@media (max-width: 1440px) {
+    html {
+        font-size: 16px;
+    }
+}
+
+@media (max-width: 1366px) {
+    html {
+        font-size: 15px;
+    }
+}
+
+@media (max-width: 1280px) {
+    html {
+        font-size: 14px;
+    }
+
+    .main .container {
+        width: 1024px;
+    }
+}
+
+@media (max-width: 1024px) {
+    .main .container {
+        width: 768px;
+    }
+}
+
+@media (max-width: 768px) {
+    .header::after {
+        width: 100%;
+    }
+
+    .main .container {
+        width: 100%;
+        padding: 0 15px;
+    }
+
+    .main {
+        flex-direction: column;
+    }
+
+    .main .heading {
+        width: 100%;
+        text-align: left;
+        padding: 0;
+        margin-bottom: 15px;
+    }
+
+    .main .heading::after {
+        display: none;
+    }
+
+    .main .content {
+        width: 100%;
+    }
+}

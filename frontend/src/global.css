@@ -1,0 +1,9 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { line-height: 1.5; }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #1A1B1E; }
+::-webkit-scrollbar-thumb { background: #373A40; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #5C5F66; }
+
+a { text-decoration: none; color: inherit; }

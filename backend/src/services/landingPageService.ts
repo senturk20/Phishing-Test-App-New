@@ -3,6 +3,35 @@ import { getPool, memoryStore, generateId } from '../db/index.js';
 import type { LandingPage } from '../types/index.js';
 
 // ============================================
+// HELPERS
+// ============================================
+
+function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 100)
+    || `page-${Date.now()}`;
+}
+
+function mapRow(row: Record<string, unknown>): LandingPage {
+  return {
+    id: row.id as string,
+    name: row.name as string,
+    slug: (row.slug as string) || '',
+    html: row.html as string,
+    originalUrl: (row.original_url as string) || '',
+    isCloned: (row.is_cloned as boolean) || false,
+    isDefault: row.is_default as boolean,
+    createdAt: row.created_at as Date,
+    updatedAt: row.updated_at as Date,
+  };
+}
+
+// ============================================
 // GET LANDING PAGES
 // ============================================
 
@@ -17,18 +46,11 @@ export async function getLandingPages(): Promise<LandingPage[]> {
   if (!p) return [];
 
   const result = await p.query(
-    `SELECT id, name, html, is_default, created_at, updated_at
+    `SELECT id, name, slug, html, original_url, is_cloned, is_default, created_at, updated_at
      FROM landing_pages ORDER BY created_at DESC`
   );
 
-  return result.rows.map((row) => ({
-    id: row.id,
-    name: row.name,
-    html: row.html,
-    isDefault: row.is_default,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }));
+  return result.rows.map(mapRow);
 }
 
 // ============================================
@@ -44,22 +66,13 @@ export async function getLandingPage(id: string): Promise<LandingPage | null> {
   if (!pool) return null;
 
   const result = await pool.query(
-    `SELECT id, name, html, is_default, created_at, updated_at
+    `SELECT id, name, slug, html, original_url, is_cloned, is_default, created_at, updated_at
      FROM landing_pages WHERE id = $1`,
     [id]
   );
 
   if (result.rows.length === 0) return null;
-
-  const row = result.rows[0];
-  return {
-    id: row.id,
-    name: row.name,
-    html: row.html,
-    isDefault: row.is_default,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
+  return mapRow(result.rows[0]);
 }
 
 // ============================================
@@ -69,9 +82,13 @@ export async function getLandingPage(id: string): Promise<LandingPage | null> {
 export async function createLandingPage(data: {
   name: string;
   html: string;
+  slug?: string;
+  originalUrl?: string;
+  isCloned?: boolean;
   isDefault?: boolean;
 }): Promise<LandingPage> {
   const now = new Date();
+  const slug = data.slug || generateSlug(data.name);
 
   if (config.useMemoryDb) {
     if (data.isDefault) {
@@ -81,7 +98,10 @@ export async function createLandingPage(data: {
     const page: LandingPage = {
       id: generateId(),
       name: data.name,
+      slug,
       html: data.html,
+      originalUrl: data.originalUrl || '',
+      isCloned: data.isCloned || false,
       isDefault: data.isDefault || false,
       createdAt: now,
       updatedAt: now,
@@ -99,23 +119,14 @@ export async function createLandingPage(data: {
   }
 
   const result = await p.query(
-    `INSERT INTO landing_pages (name, html, is_default)
-     VALUES ($1, $2, $3)
-     RETURNING id, name, html, is_default, created_at, updated_at`,
-    [data.name, data.html, data.isDefault || false]
+    `INSERT INTO landing_pages (name, slug, html, original_url, is_cloned, is_default)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING id, name, slug, html, original_url, is_cloned, is_default, created_at, updated_at`,
+    [data.name, slug, data.html, data.originalUrl || '', data.isCloned || false, data.isDefault || false]
   );
 
-  const row = result.rows[0];
-  console.log(`Landing page created: ${row.name}`);
-
-  return {
-    id: row.id,
-    name: row.name,
-    html: row.html,
-    isDefault: row.is_default,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
+  console.log(`Landing page created: ${result.rows[0].name}`);
+  return mapRow(result.rows[0]);
 }
 
 // ============================================
@@ -124,7 +135,7 @@ export async function createLandingPage(data: {
 
 export async function updateLandingPage(
   id: string,
-  data: { name?: string; html?: string; isDefault?: boolean }
+  data: { name?: string; html?: string; slug?: string; originalUrl?: string; isCloned?: boolean; isDefault?: boolean }
 ): Promise<LandingPage | null> {
   if (config.useMemoryDb) {
     const page = memoryStore.landingPages.find((p) => p.id === id);
@@ -136,6 +147,9 @@ export async function updateLandingPage(
 
     if (data.name !== undefined) page.name = data.name;
     if (data.html !== undefined) page.html = data.html;
+    if (data.slug !== undefined) page.slug = data.slug;
+    if (data.originalUrl !== undefined) page.originalUrl = data.originalUrl;
+    if (data.isCloned !== undefined) page.isCloned = data.isCloned;
     if (data.isDefault !== undefined) page.isDefault = data.isDefault;
     page.updatedAt = new Date();
     return page;
@@ -160,6 +174,18 @@ export async function updateLandingPage(
     updates.push(`html = $${paramIndex++}`);
     values.push(data.html);
   }
+  if (data.slug !== undefined) {
+    updates.push(`slug = $${paramIndex++}`);
+    values.push(data.slug);
+  }
+  if (data.originalUrl !== undefined) {
+    updates.push(`original_url = $${paramIndex++}`);
+    values.push(data.originalUrl);
+  }
+  if (data.isCloned !== undefined) {
+    updates.push(`is_cloned = $${paramIndex++}`);
+    values.push(data.isCloned);
+  }
   if (data.isDefault !== undefined) {
     updates.push(`is_default = $${paramIndex++}`);
     values.push(data.isDefault);
@@ -173,21 +199,12 @@ export async function updateLandingPage(
   const result = await p.query(
     `UPDATE landing_pages SET ${updates.join(', ')}
      WHERE id = $${paramIndex}
-     RETURNING id, name, html, is_default, created_at, updated_at`,
+     RETURNING id, name, slug, html, original_url, is_cloned, is_default, created_at, updated_at`,
     values
   );
 
   if (result.rows.length === 0) return null;
-
-  const row = result.rows[0];
-  return {
-    id: row.id,
-    name: row.name,
-    html: row.html,
-    isDefault: row.is_default,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
+  return mapRow(result.rows[0]);
 }
 
 // ============================================

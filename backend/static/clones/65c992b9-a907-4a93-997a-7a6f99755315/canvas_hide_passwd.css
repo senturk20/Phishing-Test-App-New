@@ -1,0 +1,5 @@
+.ic-Login__link {
+  color: var(--ic-brand-Login-Content-password-text-color) !important;
+  text-decoration: underline;
+  display: none;
+}

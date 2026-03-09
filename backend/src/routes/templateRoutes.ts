@@ -17,6 +17,7 @@ interface CreateTemplateBody {
   name: string;
   subject: string;
   body: string;
+  category?: string;
   isDefault?: boolean;
 }
 
@@ -71,6 +72,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       name: req.body.name.trim(),
       subject: req.body.subject,
       body: req.body.body,
+      category: req.body.category,
       isDefault: req.body.isDefault,
     });
 
@@ -88,6 +90,7 @@ router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
       name: body.name?.trim(),
       subject: body.subject,
       body: body.body,
+      category: body.category,
       isDefault: body.isDefault,
     });
     if (!template) {

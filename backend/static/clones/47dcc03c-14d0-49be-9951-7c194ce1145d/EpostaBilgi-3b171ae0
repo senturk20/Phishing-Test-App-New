@@ -1,0 +1,369 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <!-- Tell the browser to be responsive to screen width -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <!-- Favicon icon -->
+    <link rel="icon" type="image/png" sizes="16x16" href="/img/favicon.png">
+    <title>Hesap Yönetim Sistemi</title>
+    <!-- Custom CSS -->
+    <link href="/dist/css/style.min.css" rel="stylesheet">
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.min.css" />
+
+    <link href="/css/site.css" rel="stylesheet">
+    <link href="/dist/css/pages/floating-label.css" rel="stylesheet">
+    <link href="/dist/css/pages/icon-page.css" rel="stylesheet">
+    <script src="/assets/node_modules/jquery/jquery-3.2.1.min.js"></script>
+    <!-- Bootstrap tether Core JavaScript -->
+    <script src="/assets/node_modules/popper/popper.min.js"></script>
+    <script src="/assets/node_modules/bootstrap/dist/js/bootstrap.min.js"></script>
+    <!-- slimscrollbar scrollbar JavaScript -->
+    <script src="/dist/js/perfect-scrollbar.jquery.min.js"></script>
+    <!--Wave Effects -->
+    <script src="/dist/js/waves.js"></script>
+    <!--Menu sidebar -->
+    <script src="/dist/js/sidebarmenu.js"></script>
+    <!--Custom JavaScript -->
+    <script src="/dist/js/custom.min.js"></script>
+    <link href="/assets/node_modules/bootstrap-datepicker/bootstrap-datepicker.min.css" rel="stylesheet" type="text/css">
+    <script src="/js/site.js?v=4q1jwFhaPaZgr8WAUSrux6hAuh0XDg9kPS3xIVq36I0"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- DataTables JS -->
+    <script type="text/javascript" src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+
+    <style>
+        .navbar {
+            background-color: #911d0e;
+            height: auto;
+        }
+
+        .footer {
+            position: fixed;
+            height: 50px;
+            bottom: 0px;
+            left: 0px;
+            right: 0px;
+            margin-bottom: 0px;
+        }
+
+
+
+
+        @media only screen and (max-width: 600px) {
+            #HesapYonetimBanner {
+                font-size: 16px;
+            }
+
+
+            #AdminGirisIcon {
+                font-size: 15px !important;
+            }
+
+            #AdminGiris {
+                font-size: 12px !important;
+            }
+        }
+
+    </style>
+</head>
+
+
+<body class="skin-red fixed-header">
+    <div b-hlt5lbj3ko id="main-wrapper">
+        <header b-hlt5lbj3ko class="topbar">
+            <nav b-hlt5lbj3ko class="navbar top-navbar navbar-expand-sm navbar-expand-md row">
+
+                <div b-hlt5lbj3ko class="col-sm-1">
+                    <ul b-hlt5lbj3ko class="navbar-nav">
+                        <li b-hlt5lbj3ko class="nav-item"> <a b-hlt5lbj3ko class="nav-link nav-toggler d-block d-md-none waves-effect waves-light hamburger" href="javascript:void(0)"><i b-hlt5lbj3ko style="color:#fff" class="ti-close ti-menu"></i></a> </li>
+                    </ul>
+                </div>
+                <div b-hlt5lbj3ko class="mt-2 col-sm-10" align="center" style="background:rgba(0, 0, 0, 0.00);">
+                    <a class="navbar-brand d-block" href="/">
+                        <img src="/img/estu_logo.jpg" alt="homepage" class="rounded" height="60px" />
+
+                        <div b-hlt5lbj3ko class="mt-3" style="font-size:24px; color:#fff;"><div b-hlt5lbj3ko id="HesapYonetimBanner" class="font-bold d-inline"> Hesap Yönetimi Sistemi </div> </div>
+                    </a>
+                </div>
+
+                        <div b-hlt5lbj3ko style="cursor:pointer" onclick="window.location='https://giris.eskisehir.edu.tr/login?client_id=2d00bed8-fa2a-11ed-bf57-0050569a48d3&redirect_uri=https://hesap.eskisehir.edu.tr/Home/Login'" ; class="col-sm-1 text-center d-sm-flex align-items-center">
+
+                            <div b-hlt5lbj3ko id="AdminGiris" style="font-size:18px;color:#fff;">Admin Girişi Yap</div><i b-hlt5lbj3ko id="AdminGirisIcon" class="mdi mdi-login-variant mr-4" style="color:#fff;font-size:25px"></i>
+
+                        </div>
+
+
+
+
+
+
+            </nav>
+        </header>
+
+        <aside b-hlt5lbj3ko class="left-sidebar" style="padding-top:150px">
+            <!-- Sidebar scroll-->
+            <div b-hlt5lbj3ko class="scroll-sidebar">
+                <!-- Sidebar navigation-->
+                <nav b-hlt5lbj3ko class="sidebar-nav">
+                    <ul b-hlt5lbj3ko id="sidebarnav">
+                        <li b-hlt5lbj3ko><a class="list-inline-item" href="/Home/EpostaBilgi"><i b-hlt5lbj3ko class="mdi mdi-email"></i> E-posta Hesabı Öğrenme</a></li>
+                        <li b-hlt5lbj3ko><a class="list-inline-item" href="/Home/SifreDegistir"><i b-hlt5lbj3ko class="mdi mdi-key-change"></i> Şifre Değiştirme</a></li>
+                        <li b-hlt5lbj3ko><a class="list-inline-item" href="/Home/SifreSifirlaTc"><i b-hlt5lbj3ko class="mdi mdi-reload"></i> Şifre Sıfırlama</a></li>
+                        <li b-hlt5lbj3ko><a class="list-inline-item" href="/EpostaAlma/EpostaAlmaTc"><i b-hlt5lbj3ko class="mdi mdi-at"></i> E-posta alma</a></li>
+
+                        <li b-hlt5lbj3ko>
+                            <a b-hlt5lbj3ko class="has-arrow waves-effect waves-dark" href="javascript:void(0)" aria-expanded="false"><i b-hlt5lbj3ko class="mdi mdi-account-settings-variant"></i><span b-hlt5lbj3ko class="hide-menu">Misafir Hesap İşlemleri</span></a>
+                            <ul b-hlt5lbj3ko aria-expanded="false" class="collapse">
+                                <li b-hlt5lbj3ko><a class="list-inline-item2" href="/Guest/CreateGuestAccount"><i b-hlt5lbj3ko class="mdi mdi-account-multiple-plus"></i> Misafir Hesabı Oluştur</a></li>
+
+                                <li b-hlt5lbj3ko><a href="/Guest/MyGuestAccounts"><i b-hlt5lbj3ko class="mdi mdi-account-multiple"></i> Misafir Hesaplarım</a></li>
+
+                            </ul>
+                        </li>
+                        
+                    </ul>
+                </nav>
+
+            </div>
+
+        </aside>
+        <div b-hlt5lbj3ko class="page-wrapper">
+            <div b-hlt5lbj3ko class="container-fluid">
+                <div b-hlt5lbj3ko class="row" style="padding-top:100px">
+                    <div b-hlt5lbj3ko class="col-12">
+                        <div b-hlt5lbj3ko class="card">
+                            <div b-hlt5lbj3ko class="card-body">
+                                
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+<link rel="stylesheet" href="/_content/AspNetCoreHero.ToastNotification/notyf.min.css">
+<script src="/_content/AspNetCoreHero.ToastNotification/notyf.min.js"></script>
+<script>
+    const notyf = new Notyf({"duration":10000,"position":{"x":"right","y":"top"},"dismissible":true,"ripple":true,"types":[{"type":"success","background":"#28a745"},{"type":"error","background":"#dc3545"},{"type":"warning","background":"orange","className":"text-dark","icon":{"className":"fa fa-warning text-dark","tagName":"i"}},{"type":"info","background":"#17a2b8","icon":{"className":"fa fa-info text-white","tagName":"i"}},{"type":"custom","background":"black"}]});
+</script>
+<script type="text/javascript">
+
+    function toastNotifySuccess(message, duration) {
+        if (duration) { notyf.success({ message: message, duration: duration }); }
+        else { notyf.success({ message: message }); }
+    }
+    function toastNotifyError(message, duration) {
+        if (duration) { notyf.error({ message: message, duration: duration }); }
+        else { notyf.error({ message: message }); }
+    }
+    function toastNotifyWarning(message, duration) {
+        if (duration) { notyf.open({ type: 'warning', message: message, duration: duration }); }
+        else { notyf.open({ type: 'warning', message: message }); }
+
+    }
+    function toastNotifyInformation(message, duration) {
+        if (duration) { notyf.open({ type: 'info', message: message, duration: duration }); }
+        else { notyf.open({ type: 'info', message: message }); }
+
+    }
+    function toastNotifyCustom(message, duration, color, iconClass) {
+
+        var lightOrDarkClassName = pickTextColorBasedOnBgColorAdvanced(color);
+        var iconClassName = iconClass.concat(' ').concat(lightOrDarkClassName);
+        if (duration) {
+            notyf.open({
+                type: 'custom',
+                message: message,
+                duration: duration,
+                className: lightOrDarkClassName,
+                background: color,
+                icon: {
+                    className: iconClassName,
+                    tagName: 'i'
+                }
+            });
+        }
+        else {
+            notyf.open({
+                type: 'custom',
+                message: message,
+                className: lightOrDarkClassName,
+                background: color,
+                icon: {
+                    className: iconClassName,
+                    tagName: 'i'
+                }
+            });
+        }
+
+    }
+    function colourNameToHex(colour) {
+        var colours = {
+            "aliceblue": "#f0f8ff", "antiquewhite": "#faebd7", "aqua": "#00ffff", "aquamarine": "#7fffd4", "azure": "#f0ffff",
+            "beige": "#f5f5dc", "bisque": "#ffe4c4", "black": "#000000", "blanchedalmond": "#ffebcd", "blue": "#0000ff", "blueviolet": "#8a2be2", "brown": "#a52a2a", "burlywood": "#deb887",
+            "cadetblue": "#5f9ea0", "chartreuse": "#7fff00", "chocolate": "#d2691e", "coral": "#ff7f50", "cornflowerblue": "#6495ed", "cornsilk": "#fff8dc", "crimson": "#dc143c", "cyan": "#00ffff",
+            "darkblue": "#00008b", "darkcyan": "#008b8b", "darkgoldenrod": "#b8860b", "darkgray": "#a9a9a9", "darkgreen": "#006400", "darkkhaki": "#bdb76b", "darkmagenta": "#8b008b", "darkolivegreen": "#556b2f",
+            "darkorange": "#ff8c00", "darkorchid": "#9932cc", "darkred": "#8b0000", "darksalmon": "#e9967a", "darkseagreen": "#8fbc8f", "darkslateblue": "#483d8b", "darkslategray": "#2f4f4f", "darkturquoise": "#00ced1",
+            "darkviolet": "#9400d3", "deeppink": "#ff1493", "deepskyblue": "#00bfff", "dimgray": "#696969", "dodgerblue": "#1e90ff",
+            "firebrick": "#b22222", "floralwhite": "#fffaf0", "forestgreen": "#228b22", "fuchsia": "#ff00ff",
+            "gainsboro": "#dcdcdc", "ghostwhite": "#f8f8ff", "gold": "#ffd700", "goldenrod": "#daa520", "gray": "#808080", "green": "#008000", "greenyellow": "#adff2f",
+            "honeydew": "#f0fff0", "hotpink": "#ff69b4",
+            "indianred ": "#cd5c5c", "indigo": "#4b0082", "ivory": "#fffff0", "khaki": "#f0e68c",
+            "lavender": "#e6e6fa", "lavenderblush": "#fff0f5", "lawngreen": "#7cfc00", "lemonchiffon": "#fffacd", "lightblue": "#add8e6", "lightcoral": "#f08080", "lightcyan": "#e0ffff", "lightgoldenrodyellow": "#fafad2",
+            "lightgrey": "#d3d3d3", "lightgreen": "#90ee90", "lightpink": "#ffb6c1", "lightsalmon": "#ffa07a", "lightseagreen": "#20b2aa", "lightskyblue": "#87cefa", "lightslategray": "#778899", "lightsteelblue": "#b0c4de",
+            "lightyellow": "#ffffe0", "lime": "#00ff00", "limegreen": "#32cd32", "linen": "#faf0e6",
+            "magenta": "#ff00ff", "maroon": "#800000", "mediumaquamarine": "#66cdaa", "mediumblue": "#0000cd", "mediumorchid": "#ba55d3", "mediumpurple": "#9370d8", "mediumseagreen": "#3cb371", "mediumslateblue": "#7b68ee",
+            "mediumspringgreen": "#00fa9a", "mediumturquoise": "#48d1cc", "mediumvioletred": "#c71585", "midnightblue": "#191970", "mintcream": "#f5fffa", "mistyrose": "#ffe4e1", "moccasin": "#ffe4b5",
+            "navajowhite": "#ffdead", "navy": "#000080",
+            "oldlace": "#fdf5e6", "olive": "#808000", "olivedrab": "#6b8e23", "orange": "#ffa500", "orangered": "#ff4500", "orchid": "#da70d6",
+            "palegoldenrod": "#eee8aa", "palegreen": "#98fb98", "paleturquoise": "#afeeee", "palevioletred": "#d87093", "papayawhip": "#ffefd5", "peachpuff": "#ffdab9", "peru": "#cd853f", "pink": "#ffc0cb", "plum": "#dda0dd", "powderblue": "#b0e0e6", "purple": "#800080",
+            "rebeccapurple": "#663399", "red": "#ff0000", "rosybrown": "#bc8f8f", "royalblue": "#4169e1",
+            "saddlebrown": "#8b4513", "salmon": "#fa8072", "sandybrown": "#f4a460", "seagreen": "#2e8b57", "seashell": "#fff5ee", "sienna": "#a0522d", "silver": "#c0c0c0", "skyblue": "#87ceeb", "slateblue": "#6a5acd", "slategray": "#708090", "snow": "#fffafa", "springgreen": "#00ff7f", "steelblue": "#4682b4",
+            "tan": "#d2b48c", "teal": "#008080", "thistle": "#d8bfd8", "tomato": "#ff6347", "turquoise": "#40e0d0",
+            "violet": "#ee82ee",
+            "wheat": "#f5deb3", "white": "#ffffff", "whitesmoke": "#f5f5f5",
+            "yellow": "#ffff00", "yellowgreen": "#9acd32"
+        };
+
+        if (typeof colours[colour.toLowerCase()] != 'undefined')
+            return colours[colour.toLowerCase()];
+
+        return false;
+    }
+    function pickTextColorBasedOnBgColorAdvanced(bgColor) {
+
+        var hexColor = colourNameToHex(bgColor);
+        var color = (bgColor.charAt(0) === '#') ? bgColor.substring(1, 7) : hexColor.substring(1, 7);
+        var r = parseInt(color.substring(0, 2), 16); // hexToR
+        var g = parseInt(color.substring(2, 4), 16); // hexToG
+        var b = parseInt(color.substring(4, 6), 16); // hexToB
+        var uicolors = [r / 255, g / 255, b / 255];
+        var c = uicolors.map((col) => {
+            if (col <= 0.03928) {
+                return col / 12.92;
+            }
+            return Math.pow((col + 0.055) / 1.055, 2.4);
+        });
+        var L = (0.2126 * c[0]) + (0.7152 * c[1]) + (0.0722 * c[2]);
+        return (L > 0.179) ? 'text-dark' : 'text-white';
+    }
+</script>
+
+
+
+
+
+    <div class="card">
+        <div class="card-body">
+            <form method="post" action="/Home/EpostaBilgi">
+                <div class="row p-t-20 ">
+                    <div class="col-md-6 ">
+                        <input type="hidden" id="EpostaBilgiViewModelToken" class="form-control" name="Token" value="" />
+
+                        <div class="form-group ">
+
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="control-label">TC Kimlik Numarası</label>
+                                    <input type="text" class="form-control" required id="TcKimlik" name="TcKimlik" value="">
+
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="control-label">Doğum Tarihi</label>
+                                    <input type="date" class="form-control" required id="DogumTarihi" name="DogumTarihi" value="">
+                                </div>
+                            </div>
+                            <div class="text-center col-md-6">
+                                <button type="submit" class="btn btn-danger mt-4" style="width:200px ; max-width : 100%">Sorgula</button>
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8CNv9b4ZxwNPiemiAwP2sREJpBXjYnqhRUPzI1UNydiOB3G8IaxQaltrpJr2VXxXAGOhm5XIgmff74cGjhWyEKbFkcX5eMmBf2S10IIU1EO1hdtAOKe6o98gk0j4OQc-iwZpk5sd93InNFHMBq9Gmcg" /></form>
+        </div>
+    </div>
+
+<script src="https://www.google.com/recaptcha/api.js?render=6LcXWjYsAAAAAO5aOhSjSaItYy_AB0916q0WbaLI"></script>
+<script src="/assets/node_modules/inputmask/dist/min/jquery.inputmask.bundle.min.js"></script>
+<script src="/dist/js/pages/mask.init.js"></script>
+<script type="text/javascript">
+    // Date Picker
+    jQuery('.mydatepicker').datepicker();
+</script>
+<script>
+
+    function getToken() {
+        grecaptcha.ready(function () {
+            grecaptcha.execute('6LcXWjYsAAAAAO5aOhSjSaItYy_AB0916q0WbaLI', { action: 'submit' }).then(function (token) {
+                // Add your logic to submit to your backend server here.
+                console.log(token);
+                document.getElementById("EpostaBilgiViewModelToken").value = token;
+            });
+        });
+    }
+
+    setInterval(getToken(), 115000)
+    $(function () {
+        getToken();
+    });
+
+
+    $(document).ready(function () {
+        if (2 == 0) {
+            Swal.fire({
+                title: 'Hata!',
+                text: '',
+                icon: 'error',
+                confirmButtonText: 'TAMAM'
+            })
+        }
+    });
+
+
+
+</script>
+
+
+
+
+
+
+
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- ============================================================== -->
+        <!-- End Page wrapper  -->
+        <!-- ============================================================== -->
+        <!-- ============================================================== -->
+        <!-- footer -->
+        <!-- ============================================================== -->
+        <footer b-hlt5lbj3ko class="footer ">
+            &copy; 2025 - Eskişehir Teknik Üniversitesi Bilgi İşlem Dairesi Başkanlığı  <a href="/Home/Privacy"></a>
+        </footer>
+        <!-- ============================================================== -->
+        <!-- End footer -->
+        <!-- ============================================================== -->
+    </div>
+    <!-- ============================================================== -->
+    <!-- End Wrapper -->
+    <!-- ============================================================== -->
+    <!-- ============================================================== -->
+    <!-- All Jquery -->
+    <!-- ============================================================== -->
+    
+
+</body>
+</html>

@@ -109,6 +109,7 @@ export interface EmailTemplate {
   name: string;
   subject: string;
   body: string;
+  category: string;
   isDefault: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -121,8 +122,24 @@ export interface EmailTemplate {
 export interface LandingPage {
   id: string;
   name: string;
+  slug: string;
   html: string;
+  originalUrl: string;
+  isCloned: boolean;
   isDefault: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ============================================
+// ADMIN TYPES
+// ============================================
+
+export interface Admin {
+  id: string;
+  username: string;
+  passwordHash: string;
+  role: string;
   createdAt: Date;
   updatedAt: Date;
 }

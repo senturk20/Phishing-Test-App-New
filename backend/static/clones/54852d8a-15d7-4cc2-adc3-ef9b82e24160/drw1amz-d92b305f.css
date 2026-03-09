@@ -1,0 +1,43 @@
+/*
+ * The Typekit service used to deliver this font or fonts for use on websites
+ * is provided by Adobe and is subject to these Terms of Use
+ * http://www.adobe.com/products/eulas/tou_typekit. For font license
+ * information, see the list below.
+ *
+ * quicksand:
+ *   - http://typekit.com/eulas/00000000000000007735a12c
+ *   - http://typekit.com/eulas/00000000000000007735a130
+ *   - http://typekit.com/eulas/00000000000000007735a132
+ *   - http://typekit.com/eulas/00000000000000007735a135
+ *
+ * © 2009-2026 Adobe Systems Incorporated. All Rights Reserved.
+ */
+/*{"last_published":"2023-03-02 12:37:48 UTC"}*/
+
+@import url("p-19a9d0c3.css");
+
+@font-face {
+font-family:"quicksand";
+src:url("l-ec856ee8") format("woff2"),url("d-23db12c6") format("woff"),url("a-4332eb1a") format("opentype");
+font-display:auto;font-style:normal;font-weight:300;font-stretch:normal;
+}
+
+@font-face {
+font-family:"quicksand";
+src:url("l-8ea0d5b1") format("woff2"),url("d-0e53d339") format("woff"),url("a-af610571") format("opentype");
+font-display:auto;font-style:normal;font-weight:700;font-stretch:normal;
+}
+
+@font-face {
+font-family:"quicksand";
+src:url("l-a3d38548") format("woff2"),url("d-3533f401") format("woff"),url("a-94ebd715") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"quicksand";
+src:url("l-e6b30acc") format("woff2"),url("d-de61b4bd") format("woff"),url("a-eecf3ed0") format("opentype");
+font-display:auto;font-style:normal;font-weight:500;font-stretch:normal;
+}
+
+.tk-quicksand { font-family: "quicksand",sans-serif; }

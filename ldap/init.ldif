@@ -1,13 +1,6 @@
-# Base DN
-dn: dc=university,dc=edu,dc=tr
-objectClass: top
-objectClass: dcObject
-objectClass: organization
-o: University
-dc: university
-
-# Admin user (already created by container)
-# dn: cn=admin,dc=university,dc=edu,dc=tr
+# Base DN and Admin user are auto-created by osixia/openldap
+# from LDAP_DOMAIN and LDAP_ADMIN_PASSWORD environment variables.
+# Do NOT include them here — the LDIF loader aborts on duplicate entries.
 
 # Organizational Units
 dn: ou=users,dc=university,dc=edu,dc=tr

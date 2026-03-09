@@ -10,11 +10,21 @@ let transporter: Transporter | null = null;
 
 function getTransporter(): Transporter {
   if (!transporter) {
-    transporter = nodemailer.createTransport({
+    const options: Record<string, unknown> = {
       host: config.smtp.host,
       port: config.smtp.port,
-      secure: false, // MailHog does not use TLS
-    });
+      secure: config.smtp.secure,
+    };
+
+    // Production mode: add auth when credentials are provided
+    if (config.smtp.user && config.smtp.pass) {
+      options.auth = {
+        user: config.smtp.user,
+        pass: config.smtp.pass,
+      };
+    }
+
+    transporter = nodemailer.createTransport(options);
   }
   return transporter;
 }

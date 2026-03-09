@@ -4,6 +4,7 @@ import type {
   Recipient,
   EmailTemplate,
   LandingPage,
+  Admin,
 } from '../types/index.js';
 
 export const memoryStore = {
@@ -12,6 +13,7 @@ export const memoryStore = {
   recipients: [] as Recipient[],
   emailTemplates: [] as EmailTemplate[],
   landingPages: [] as LandingPage[],
+  admins: [] as Admin[],
   nextId: 1,
 };
 
