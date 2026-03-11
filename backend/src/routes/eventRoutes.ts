@@ -1,5 +1,9 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { insertEvent } from '../services/index.js';
+import {
+  insertEvent,
+  getRecipientByToken,
+  updateRecipientStatus,
+} from '../services/index.js';
 
 const router = Router();
 
@@ -35,10 +39,14 @@ function isValidEventBody(body: unknown): body is EventBody {
 // ROUTES
 // ============================================
 
-// Track event
+// Track event — PUBLIC endpoint (no JWT required)
+// Called by LandingPage.tsx when phishing targets interact with the page.
 router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    console.log(`[Events] POST /events — type=${req.body?.type}, token=${req.body?.recipientToken}`);
+
     if (!isValidEventBody(req.body)) {
+      console.log('[Events] Invalid body:', req.body);
       res.status(400).json({ error: 'Invalid request body' });
       return;
     }
@@ -47,7 +55,24 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
     const ipAddress = req.ip || req.socket.remoteAddress;
     const userAgent = req.get('User-Agent');
 
+    // 1. Insert the event row
     await insertEvent(type, campaignId, recipientToken, ipAddress, userAgent);
+    console.log(`[Events] Event inserted: type=${type}, campaign=${campaignId}, token=${recipientToken}`);
+
+    // 2. Update recipient status based on event type
+    const recipient = await getRecipientByToken(recipientToken);
+    if (recipient) {
+      if (type === 'clicked' && recipient.status === 'sent') {
+        await updateRecipientStatus(recipientToken, 'clicked');
+        console.log(`[Events] Recipient status updated: ${recipientToken} → clicked`);
+      } else if (type === 'submitted' && (recipient.status === 'sent' || recipient.status === 'clicked')) {
+        await updateRecipientStatus(recipientToken, 'submitted');
+        console.log(`[Events] Recipient status updated: ${recipientToken} → submitted`);
+      }
+    } else {
+      console.log(`[Events] WARNING: Recipient not found for token="${recipientToken}"`);
+    }
+
     res.status(201).json({ success: true });
   } catch (err) {
     next(err);

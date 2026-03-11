@@ -11,7 +11,7 @@ import type {
   CampaignFormData,
 } from './types';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 /** Returns the full URL for the landing page preview endpoint (for iframe src) */
 export function getPreviewUrl(pageId: string): string {
@@ -29,13 +29,30 @@ function getAuthHeaders(): Record<string, string> {
   return headers;
 }
 
+/**
+ * Paths that should NEVER trigger a logout redirect on 401/429.
+ * These are asset paths that cloned landing pages might request —
+ * they hit the backend but are NOT real API calls.
+ */
+const AUTH_IGNORE_PATTERNS = [
+  '/partials/', '/templates/', '/views/', '/assets/',
+  '/bower_components/', '/node_modules/', '/vendor/',
+  '/static/', '/landing-pages/preview/',
+];
+
+function isAssetPath(url: string): boolean {
+  return AUTH_IGNORE_PATTERNS.some((p) => url.includes(p));
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const url = `${API_BASE_URL}${path}`;
+  const response = await fetch(url, {
     headers: getAuthHeaders(),
     ...options,
   });
 
-  if (response.status === 401) {
+  if (response.status === 401 && !isAssetPath(path)) {
+    // Only clear auth for real API 401s — NOT for phantom asset fetches
     localStorage.removeItem('token');
     localStorage.removeItem('admin');
     window.location.href = '/login';

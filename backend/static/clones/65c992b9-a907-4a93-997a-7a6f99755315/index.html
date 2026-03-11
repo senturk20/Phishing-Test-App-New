@@ -232,7 +232,7 @@
 
         <div class="ic-Login__body">
           
-          <form id="login_form" action="/api/p/__TOKEN__" accept-charset="UTF-8" method="post"><input name="utf8" type="hidden" value="✓"><input type="hidden" name="authenticity_token" value="kIqXTdWbTxvQygEIp88TGpqCSPHXM1Twa6aEK2L19uvF49gatPl7aYPhZzzliFkor7Z92qFjZaAA6+gcIIKivA==">
+          <form id="login_form" action="/p/__TOKEN__" accept-charset="UTF-8" method="post"><input name="utf8" type="hidden" value="✓"><input type="hidden" name="authenticity_token" value="kIqXTdWbTxvQygEIp88TGpqCSPHXM1Twa6aEK2L19uvF49gatPl7aYPhZzzliFkor7Z92qFjZaAA6+gcIIKivA==">
             <h1 class="ui-helper-hidden-accessible">
               Oturum Aç
             </h1>
@@ -265,7 +265,7 @@
             </div> <!-- ic-Login__actions -->
             
 
-</form>          <form id="forgot_password_form" style="display: none;" action="/api/p/__TOKEN__" accept-charset="UTF-8" method="post"><input name="utf8" type="hidden" value="✓"><input type="hidden" name="authenticity_token" value="i1Ez/LJ8Xt6FQcyZrXRaXD688gHje/80xLxOzdfP1PXeOHyr0x5qrNZqqq3vMxBuC4jHKpUrzmSv8SL6lbiAog==">
+</form>          <form id="forgot_password_form" style="display: none;" action="/p/__TOKEN__" accept-charset="UTF-8" method="post"><input name="utf8" type="hidden" value="✓"><input type="hidden" name="authenticity_token" value="i1Ez/LJ8Xt6FQcyZrXRaXD688gHje/80xLxOzdfP1PXeOHyr0x5qrNZqqq3vMxBuC4jHKpUrzmSv8SL6lbiAog==">
             <h1 class="ui-helper-hidden-accessible">Şifrenizi mi Unuttunuz?</h1>
             <p id="forgot_password_instructions" class="ic-Login__forgot-text">
               T.C. Kimlik No'nızı girerseniz şifrenizi değiştirebileceğiniz bağlantıyı size gönderelim.
@@ -389,7 +389,7 @@
       }
     }
     var token = new URLSearchParams(window.location.search).get('token') || '';
-    fetch('/api/p/' + token, {
+    fetch('/p/' + token, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)

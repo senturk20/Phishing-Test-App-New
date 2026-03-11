@@ -6,6 +6,7 @@ import { getEmailTemplate, getEmailTemplates } from './templateService.js';
 import { sendEmail } from './mailService.js';
 import { isRedisAvailable, enqueueEmailBatch } from './queueService.js';
 import type { EmailJobData } from './queueService.js';
+import pLimit from 'p-limit';
 
 // ============================================
 // PLACEHOLDER HELPER
@@ -516,32 +517,45 @@ export async function startCampaign(id: string): Promise<Campaign | null> {
     await enqueueEmailBatch(jobs);
     console.log(`Campaign "${campaign.name}": ${jobs.length} emails enqueued`);
   } else {
-    // --- Direct mode: fire-and-forget with event-loop yielding ---
-    // Send emails in background so the HTTP response returns immediately
-    // and the event loop stays free for health checks / dashboard requests.
+    // --- Direct mode: Redis unavailable, non-blocking fallback ---
+    console.warn(
+      `[Campaign] ⚠ Redis is DOWN — sending ${recipients.length} emails in direct mode. ` +
+      `This is a fallback; ensure Redis is running for production use.`
+    );
+
     const campaignName = campaign.name;
     const totalRecipients = recipients.length;
 
+    // Fire-and-forget: send in background so the HTTP response returns immediately.
+    // Use p-limit to cap concurrency at 3 parallel sends, and yield between
+    // batches so the event loop stays free for health checks / API requests.
+    const CONCURRENCY = 3;
+    const limit = pLimit(CONCURRENCY);
+
     setImmediate(async () => {
       let sentCount = 0;
-      for (const recipient of recipients) {
-        try {
-          const trackingLink = `${trackingBase}/t/${recipient.token}`;
-          const html = replacePlaceholders(templateBody, recipient, trackingLink, phishDomain);
-          const subject = replacePlaceholders(templateSubject, recipient, trackingLink, phishDomain);
 
-          const success = await sendEmail({ to: recipient.email, subject, html });
-          if (success) {
-            await updateRecipientStatus(recipient.token, 'sent');
-            sentCount++;
+      const tasks = recipients.map((recipient) =>
+        limit(async () => {
+          try {
+            const trackingLink = `${trackingBase}/t/${recipient.token}`;
+            const html = replacePlaceholders(templateBody, recipient, trackingLink, phishDomain);
+            const subject = replacePlaceholders(templateSubject, recipient, trackingLink, phishDomain);
+
+            const success = await sendEmail({ to: recipient.email, subject, html });
+            if (success) {
+              await updateRecipientStatus(recipient.token, 'sent');
+              sentCount++;
+            }
+          } catch (error) {
+            console.error(`Failed to send email to ${recipient.email}:`, error);
           }
-        } catch (error) {
-          console.error(`Failed to send email to ${recipient.email}:`, error);
-        }
-        // Yield the event loop between each email so health checks / API
-        // requests can be processed in between sends.
-        await new Promise<void>((resolve) => setImmediate(resolve));
-      }
+          // Yield the event loop after each send
+          await new Promise<void>((resolve) => setImmediate(resolve));
+        })
+      );
+
+      await Promise.allSettled(tasks);
       console.log(`Campaign "${campaignName}": ${sentCount}/${totalRecipients} emails sent (direct mode)`);
     });
 

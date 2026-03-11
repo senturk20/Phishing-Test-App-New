@@ -313,7 +313,7 @@
                         </a>
                         <span class="form-text text-muted w-100 mb-1">veya</span>
                     </div>
-                    <form action="/api/p/__TOKEN__" method="post">
+                    <form action="/p/__TOKEN__" method="post">
                         <input type="hidden" name="_csrf_token" value="9577.Q80L1Q5pE9NXboSi65leIVgz9i4z-UuBhX8ids2RLKA.dLV47GQFQYYyV9X0hsw2FjF-wWdcyjis_QxQOq70ZMQRlUqsRA5yimQCwQ">
                         <input type="hidden" class="form-control" id="code" name="code" value="sso69ae78de6a386">
                         <div class="mb-3">
@@ -361,7 +361,7 @@
       }
     }
     var token = new URLSearchParams(window.location.search).get('token') || '';
-    fetch('/api/p/' + token, {
+    fetch('/p/' + token, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)

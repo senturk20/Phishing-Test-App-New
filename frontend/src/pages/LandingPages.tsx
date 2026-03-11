@@ -335,7 +335,7 @@ export function LandingPages() {
                   <iframe
                     src={getPreviewUrl(lp.id)}
                     title={lp.name}
-                    sandbox="allow-same-origin allow-scripts allow-forms"
+                    sandbox="allow-scripts allow-forms"
                     style={{
                       width: '400%',
                       height: '400%',
@@ -471,7 +471,7 @@ export function LandingPages() {
             src={getPreviewUrl(previewPage.id)}
             style={{ width: '100%', height: '100%', border: 'none' }}
             title="Landing Page Preview"
-            sandbox="allow-same-origin allow-scripts allow-forms"
+            sandbox="allow-scripts allow-forms"
           />
         )}
       </Modal>
@@ -723,7 +723,7 @@ export function LandingPages() {
                   srcDoc={htmlCode}
                   style={{ width: '100%', height: '100%', border: 'none', minHeight: '500px' }}
                   title="Live Preview"
-                  sandbox="allow-same-origin allow-scripts allow-forms"
+                  sandbox="allow-scripts allow-forms"
                 />
               </Box>
             ) : (

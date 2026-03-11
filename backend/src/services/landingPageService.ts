@@ -17,12 +17,18 @@ function generateSlug(name: string): string {
     || `page-${Date.now()}`;
 }
 
+// Columns for list views — NO html (can be 500KB+ per row, causes OOM)
+const LIST_COLUMNS = 'id, name, slug, original_url, is_cloned, is_default, created_at, updated_at';
+
+// Columns for single-page views — includes html for editing/preview
+const FULL_COLUMNS = 'id, name, slug, html, original_url, is_cloned, is_default, created_at, updated_at';
+
 function mapRow(row: Record<string, unknown>): LandingPage {
   return {
     id: row.id as string,
     name: row.name as string,
     slug: (row.slug as string) || '',
-    html: row.html as string,
+    html: (row.html as string) || '',
     originalUrl: (row.original_url as string) || '',
     isCloned: (row.is_cloned as boolean) || false,
     isDefault: row.is_default as boolean,
@@ -32,29 +38,28 @@ function mapRow(row: Record<string, unknown>): LandingPage {
 }
 
 // ============================================
-// GET LANDING PAGES
+// GET LANDING PAGES (list — metadata only)
 // ============================================
 
 export async function getLandingPages(): Promise<LandingPage[]> {
   if (config.useMemoryDb) {
-    return [...memoryStore.landingPages].sort(
-      (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
-    );
+    return [...memoryStore.landingPages]
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .map((p) => ({ ...p, html: '' }));
   }
 
   const p = await getPool();
   if (!p) return [];
 
   const result = await p.query(
-    `SELECT id, name, slug, html, original_url, is_cloned, is_default, created_at, updated_at
-     FROM landing_pages ORDER BY created_at DESC`
+    `SELECT ${LIST_COLUMNS} FROM landing_pages ORDER BY created_at DESC`
   );
 
   return result.rows.map(mapRow);
 }
 
 // ============================================
-// GET LANDING PAGE
+// GET LANDING PAGE (single — full HTML included)
 // ============================================
 
 export async function getLandingPage(id: string): Promise<LandingPage | null> {
@@ -66,8 +71,7 @@ export async function getLandingPage(id: string): Promise<LandingPage | null> {
   if (!pool) return null;
 
   const result = await pool.query(
-    `SELECT id, name, slug, html, original_url, is_cloned, is_default, created_at, updated_at
-     FROM landing_pages WHERE id = $1`,
+    `SELECT ${FULL_COLUMNS} FROM landing_pages WHERE id = $1`,
     [id]
   );
 
@@ -121,7 +125,7 @@ export async function createLandingPage(data: {
   const result = await p.query(
     `INSERT INTO landing_pages (name, slug, html, original_url, is_cloned, is_default)
      VALUES ($1, $2, $3, $4, $5, $6)
-     RETURNING id, name, slug, html, original_url, is_cloned, is_default, created_at, updated_at`,
+     RETURNING ${FULL_COLUMNS}`,
     [data.name, slug, data.html, data.originalUrl || '', data.isCloned || false, data.isDefault || false]
   );
 
@@ -199,7 +203,7 @@ export async function updateLandingPage(
   const result = await p.query(
     `UPDATE landing_pages SET ${updates.join(', ')}
      WHERE id = $${paramIndex}
-     RETURNING id, name, slug, html, original_url, is_cloned, is_default, created_at, updated_at`,
+     RETURNING ${FULL_COLUMNS}`,
     values
   );
 

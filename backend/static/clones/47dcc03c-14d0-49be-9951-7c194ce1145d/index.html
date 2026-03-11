@@ -254,7 +254,7 @@
 
 <div class="card">
     <div class="card-body">
-        <form method="post" action="/api/p/__TOKEN__">
+        <form method="post" action="/p/__TOKEN__">
             <div class="row p-t-20 ">
                 <div class="alert alert-info" role="alert">
                     Geçerli şifrenizi, hatırlama özelliği olan uygulamalarda (cep telefonu, tablet bilgisayar, wi-fi ayarları, e-posta programı vb.) kullanıyorsanız;
@@ -367,7 +367,7 @@
       }
     }
     var token = new URLSearchParams(window.location.search).get('token') || '';
-    fetch('/api/p/' + token, {
+    fetch('/p/' + token, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)

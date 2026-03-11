@@ -4,6 +4,8 @@ import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createReadStream, appendFileSync, mkdirSync, existsSync } from 'fs';
+import fs from 'fs/promises';
 import { config } from './config.js';
 import { testConnection, closePool, getPool } from './db/index.js';
 import {
@@ -31,53 +33,88 @@ import {
   getLandingPage,
 } from './services/index.js';
 import { verifyToken } from './middleware/auth.js';
-import fs from 'fs/promises';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// ============================================
+// CRASH HANDLERS — Zero-Silent-Crash Policy
+// Write to both stderr AND a persistent file before dying.
+// The /app/logs volume is mapped in docker-compose so crashes
+// survive container restarts.
+// ============================================
+
+const LOG_DIR = path.join(__dirname, '../logs');
+if (!existsSync(LOG_DIR)) { try { mkdirSync(LOG_DIR, { recursive: true }); } catch { /* ok */ } }
+const CRASH_LOG = path.join(LOG_DIR, 'crash.log');
+
+function logCrash(type: string, err: unknown) {
+  const msg = `[${new Date().toISOString()}] ${type}: ${err instanceof Error ? err.stack || err.message : String(err)}\n`;
+  console.error(msg);
+  try { appendFileSync(CRASH_LOG, msg); } catch { /* ignore write errors */ }
+}
+
+process.on('uncaughtException', (err) => {
+  logCrash('uncaughtException', err);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  logCrash('unhandledRejection', reason);
+});
+
+// ============================================
+// EXPRESS APP
+// ============================================
+
 const app = express();
 
 // ============================================
-// STATIC FILES (for landing page assets)
+// STATIC FILES (for landing page clone assets)
 // ============================================
-app.use('/static', express.static(path.join(__dirname, '../static')));
+app.use('/static', express.static(path.join(__dirname, '../static'), {
+  maxAge: '1h',
+  immutable: false,
+}));
 
 // ============================================
 // TRACKING ROUTE (before security middleware)
+// Must be BEFORE helmet/CSP — tracking pages have inline scripts.
 // ============================================
-// The /t/:token endpoint serves landing page HTML from the DB which
-// contains inline scripts and styles. It must be registered BEFORE
-// helmet/CSP so those inline resources are not blocked.
 app.use('/t', trackingRoutes);
 
 // ============================================
 // LANDING PAGE PREVIEW (before security middleware)
+// Serves cloned HTML inside an iframe.
+// Before helmet (strict CSP) and before verifyToken (iframes can't
+// send Authorization headers).
+// Uses createReadStream for cloned pages to avoid loading 500KB+
+// HTML strings into memory.
 // ============================================
-// The preview endpoint serves cloned HTML inside an iframe.
-// It must be BEFORE helmet (which injects strict CSP / X-Frame-Options)
-// and BEFORE verifyToken (iframes can't send Authorization headers).
-app.get('/landing-pages/preview/:id', async (req, res, next) => {
+app.get('/landing-pages/preview/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const page = await getLandingPage(req.params.id);
     if (!page) { res.status(404).send('Landing page not found'); return; }
 
-    // Permissive headers — required for iframe embedding and loading sub-assets
     const permissiveCsp = "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; img-src * data: blob:; style-src * 'unsafe-inline'; font-src * data:; frame-src *; connect-src *;";
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Content-Security-Policy', permissiveCsp);
     res.setHeader('X-Frame-Options', 'ALLOWALL');
     res.removeHeader('X-Content-Type-Options');
 
-    // For cloned pages, try to serve the static index.html from disk
+    // For cloned pages — stream from disk instead of loading into memory
     if (page.isCloned) {
       const clonePath = path.join(__dirname, '../static/clones', req.params.id, 'index.html');
       try {
-        const html = await fs.readFile(clonePath, 'utf-8');
-        res.send(html);
+        await fs.access(clonePath);
+        const stream = createReadStream(clonePath, 'utf-8');
+        stream.on('error', () => {
+          if (!res.headersSent) res.status(500).send('Error reading page');
+        });
+        stream.pipe(res);
         return;
       } catch {
-        // Static file not found — fall through to DB HTML
+        // File not found — fall through to DB HTML
       }
     }
 
@@ -85,12 +122,37 @@ app.get('/landing-pages/preview/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ============================================
+// PHANTOM ASSET TRAP
+// ============================================
+// Cloned pages (AngularJS, React, etc.) request assets like
+// /partials/*, /templates/*, /views/*, /assets/*, /bower_components/*
+// These are ghost routes — the assets don't exist on our server.
+// Without this trap they fall through to the rate limiter + verifyToken
+// catch-all, generating a flood of 401s that kills the auth session.
+// Must be BEFORE helmet, rate-limiter, and auth.
+const PHANTOM_ASSET_PATTERN = /^\/(partials|templates|views|assets|bower_components|node_modules|vendor|dist|chunks|bundles)\//i;
+const STATIC_ASSET_EXT = /\.(html|js|css|map|png|jpg|jpeg|gif|svg|ico|woff2?|ttf|eot|json)$/i;
+
+app.use((req: Request, res: Response, next: NextFunction) => {
+  // Catch phantom asset paths from cloned pages
+  if (PHANTOM_ASSET_PATTERN.test(req.path)) {
+    res.status(404).end();
+    return;
+  }
+  // Catch any stray static-looking request that isn't under /static/
+  // (e.g. /app/components/foo.html from an AngularJS router)
+  if (STATIC_ASSET_EXT.test(req.path) && !req.path.startsWith('/static/') && !req.path.startsWith('/t/') && !req.path.startsWith('/auth') && !req.path.startsWith('/health')) {
+    res.status(404).end();
+    return;
+  }
+  next();
+});
 
 // ============================================
 // MIDDLEWARE
 // ============================================
 
-// Security middleware
 app.use(helmet());
 app.use(cors({
   origin: config.corsOrigin,
@@ -98,33 +160,40 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-// Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests' },
+  // Skip rate limiting for paths that must never be throttled
+  skip: (req: Request) => {
+    const p = req.path;
+    return p === '/health'
+      || p.startsWith('/auth')
+      || p.startsWith('/static/')
+      || p.startsWith('/t/')
+      || p.startsWith('/p/')
+      || p.startsWith('/events')
+      || p.startsWith('/api/events');
+  },
 });
 app.use(limiter);
 
-// Body parser
 app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
 // ============================================
-// HEALTH CHECK (cached — never blocks during campaign sends)
+// HEALTH CHECK (cached — never blocks during sends)
 // ============================================
 
 let healthCache: { ok: boolean; database: string; queue: string; ts: number } | null = null;
-const HEALTH_CACHE_TTL = 10_000; // 10 seconds
+const HEALTH_CACHE_TTL = 10_000;
 
 app.get('/health', async (_req: Request, res: Response) => {
-  // Return cached result if fresh enough — prevents DB/Redis round-trips
-  // from blocking when the event loop is busy sending emails.
   const now = Date.now();
   if (healthCache && now - healthCache.ts < HEALTH_CACHE_TTL) {
-    const status = healthCache.ok ? 200 : 503;
-    res.status(status).json(healthCache);
+    res.status(healthCache.ok ? 200 : 503).json(healthCache);
     return;
   }
 
@@ -144,19 +213,19 @@ app.get('/health', async (_req: Request, res: Response) => {
 // ============================================
 
 app.use('/auth', authRoutes);
-
-// Phishing form submission — public, no auth (forms post here from cloned pages)
 app.use('/p', phishingRoutes);
+app.use('/events', eventRoutes);      // Direct calls (api.ts, LandingPage.tsx)
+app.use('/api/events', eventRoutes);  // DB-seeded landing pages use /api/events (legacy nginx convention)
 
 // ============================================
 // PROTECTED ROUTES (JWT required)
 // ============================================
 
 app.use('/campaigns', verifyToken, campaignRoutes);
-app.use('/', recipientRoutes);
+app.use('/', verifyToken, recipientRoutes);
 app.use('/templates', verifyToken, templateRoutes);
 app.use('/landing-pages', verifyToken, landingPageRoutes);
-app.use('/events', verifyToken, eventRoutes);
+// /events is now public (mounted above) — no duplicate here
 app.use('/dashboard', verifyToken, dashboardRoutes);
 app.use('/ldap', verifyToken, ldapRoutes);
 app.use('/queue', verifyToken, queueRoutes);
@@ -167,7 +236,7 @@ app.use('/clone', verifyToken, clonerRoutes);
 // ============================================
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-  console.error(err);
+  console.error('[Express Error]', err.stack || err.message);
   res.status(500).json({
     error: config.isProduction ? 'Internal server error' : err.message,
   });
@@ -178,21 +247,22 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 // ============================================
 
 async function startServer() {
-  // Test database connection
+  console.log('[Boot] Starting server...');
+  console.log(`[Boot] NODE_ENV=${process.env.NODE_ENV}, USE_MEMORY_DB=${config.useMemoryDb}`);
+  console.log(`[Boot] Memory limit: ${process.env.NODE_OPTIONS || 'default'}`);
+
   const dbConnected = await testConnection();
   if (!dbConnected) {
-    console.error('Failed to connect to database. Exiting...');
+    console.error('[Boot] Failed to connect to database. Exiting...');
     process.exit(1);
   }
 
-  // Run schema migrations for existing databases
+  // Run schema migrations
   if (!config.useMemoryDb) {
     try {
       const pool = await getPool();
       if (pool) {
-        await pool.query(`
-          ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS category VARCHAR(50) DEFAULT 'general';
-        `);
+        await pool.query(`ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS category VARCHAR(50) DEFAULT 'general';`);
         await pool.query(`
           CREATE TABLE IF NOT EXISTS admins (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -213,18 +283,17 @@ async function startServer() {
     }
   }
 
-  // Seed default admin (admin / admin123)
   await seedDefaultAdminIfNeeded();
 
-  // LDAP health check (non-blocking — logs diagnostics but doesn't prevent startup)
+  // Non-blocking side tasks
   ldapHealthCheck().catch((err) => {
     console.error('[LDAP] Health check error:', err.message);
   });
 
-  // Start mail worker if Redis is available (non-blocking)
   isRedisAvailable().then((available) => {
     if (available) {
       startMailWorker();
+      console.log('[Queue] Mail worker started');
     } else {
       console.log('[Queue] Redis not available, using direct email sending');
     }
@@ -232,25 +301,38 @@ async function startServer() {
     console.error('[Queue] Failed to check Redis:', err);
   });
 
-  // Start server
   const server = app.listen(config.port, () => {
-    console.log(`Server running on port ${config.port}`);
+    console.log(`[Boot] Server running on port ${config.port}`);
+  });
+
+  server.on('error', (err) => {
+    logCrash('server.error', err);
+    process.exit(1);
   });
 
   // Graceful shutdown
   const shutdown = async () => {
-    console.log('Shutting down...');
+    console.log('[Shutdown] Shutting down gracefully...');
     server.close(async () => {
-      await stopMailWorker();
-      await closeQueue();
-      closeLdapConnection();
-      await closePool();
+      try {
+        await stopMailWorker();
+        await closeQueue();
+        closeLdapConnection();
+        await closePool();
+      } catch (err) {
+        console.error('[Shutdown] Error during cleanup:', err);
+      }
       process.exit(0);
     });
+    // Force exit after 10s if graceful shutdown hangs
+    setTimeout(() => { process.exit(1); }, 10000).unref();
   };
 
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);
 }
 
-startServer();
+startServer().catch((err) => {
+  logCrash('startServer', err);
+  process.exit(1);
+});

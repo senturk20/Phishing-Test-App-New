@@ -1,34 +1,30 @@
-# Local Development - Docker Compose
-# Tüm servisleri tek makinede çalıştırmak için kullanın
-# Production için docker-compose.backend.yml ve docker-compose.frontend.yml kullanın
-
 version: '3.8'
 
 services:
-  # PostgreSQL Database
+  # ── PostgreSQL ──────────────────────────────────────────────
   postgres:
     image: postgres:15-alpine
     container_name: phishing-postgres
     restart: unless-stopped
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-phishing}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-phishing_secret}
-      - POSTGRES_DB=${POSTGRES_DB:-phishing_db}
+      - POSTGRES_USER=phishing
+      - POSTGRES_PASSWORD=phishing_secret
+      - POSTGRES_DB=phishing_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-phishing} -d ${POSTGRES_DB:-phishing_db}"]
+      test: ["CMD-SHELL", "pg_isready -U phishing -d phishing_db"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 15s
     networks:
       - app-network
 
-  # OpenLDAP Server
+  # ── OpenLDAP ────────────────────────────────────────────────
   ldap:
     image: osixia/openldap:1.5.0
     container_name: phishing-ldap
@@ -37,44 +33,22 @@ services:
       - LDAP_ORGANISATION=University
       - LDAP_DOMAIN=university.edu.tr
       - LDAP_ADMIN_PASSWORD=${LDAP_ADMIN_PASSWORD:-admin}
-      - LDAP_CONFIG_PASSWORD=${LDAP_CONFIG_PASSWORD:-config}
-      - LDAP_READONLY_USER=false
       - LDAP_TLS=false
     volumes:
       - ldap_data:/var/lib/ldap
       - ldap_config:/etc/ldap/slapd.d
-      - ./ldap/init.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/init.ldif:ro
     ports:
       - "389:389"
     command: --copy-service
     networks:
       - app-network
 
-  # LDAP Admin (PHPLDAPAdmin - Web UI)
-  ldap-admin:
-    image: osixia/phpldapadmin:0.9.0
-    container_name: phishing-ldap-admin
-    restart: unless-stopped
-    environment:
-      - PHPLDAPADMIN_LDAP_HOSTS=ldap
-      - PHPLDAPADMIN_HTTPS=false
-    ports:
-      - "8081:80"
-    depends_on:
-      - ldap
-    networks:
-      - app-network
-
-  # Redis (BullMQ Job Queue)
+  # ── Redis (BullMQ) ─────────────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: phishing-redis
     restart: unless-stopped
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy noeviction
-    volumes:
-      - redis_data:/data
-    ports:
-      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -84,7 +58,7 @@ services:
     networks:
       - app-network
 
-  # MailHog (SMTP test server)
+  # ── MailHog (SMTP test) ────────────────────────────────────
   mailhog:
     image: mailhog/mailhog:latest
     container_name: phishing-mailhog
@@ -95,7 +69,7 @@ services:
     networks:
       - app-network
 
-  # Backend API
+  # ── Backend API (Port 8080) ────────────────────────────────
   backend:
     build:
       context: ./backend
@@ -105,56 +79,42 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=development
       - PORT=8080
-      - CORS_ORIGIN=http://localhost,http://localhost:80,http://localhost:3000,http://localhost:5173
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-phishing}:${POSTGRES_PASSWORD:-phishing_secret}@postgres:5432/${POSTGRES_DB:-phishing_db}
-      # Tracking URL base (phishing links in emails point here)
-      - TRACKING_BASE_URL=http://localhost
-      # SMTP Configuration (MailHog)
-      - SMTP_HOST=mailhog
-      - SMTP_PORT=1025
-      # JWT Configuration
-      - JWT_SECRET=${JWT_SECRET:-super-secret-jwt-key-change-in-production}
-      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-24h}
-      # Redis Configuration (BullMQ)
+      - USE_MEMORY_DB=false
+      - NODE_OPTIONS=--max-old-space-size=2048
+      # CORS — every origin the browser might use
+      - CORS_ORIGIN=http://localhost,http://localhost:80,http://localhost:3001,http://localhost:8080
+      # Service discovery via Docker DNS (service names, not container names)
+      - DATABASE_URL=postgresql://phishing:phishing_secret@postgres:5432/phishing_db
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      # LDAP Configuration
+      - SMTP_HOST=mailhog
+      - SMTP_PORT=1025
+      - JWT_SECRET=${JWT_SECRET:-super-secret-jwt-key-change-in-production}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-24h}
       - LDAP_URL=ldap://ldap:389
       - LDAP_ADMIN_DN=cn=admin,dc=university,dc=edu,dc=tr
       - LDAP_ADMIN_PASSWORD=${LDAP_ADMIN_PASSWORD:-admin}
       - LDAP_BASE_DN=dc=university,dc=edu,dc=tr
       - LDAP_USERS_OU=ou=users
-      - LDAP_USER_FILTER=(objectClass=inetOrgPerson)
-      # LDAP Attribute Mapping (change these for Active Directory or custom schemas)
-      # For AD: LDAP_ATTR_USERNAME=sAMAccountName
-      - LDAP_ATTR_EMAIL=mail
-      - LDAP_ATTR_FIRSTNAME=givenName
-      - LDAP_ATTR_LASTNAME=sn
-      - LDAP_ATTR_USERNAME=uid
-      - LDAP_ATTR_FULLNAME=cn
+      - TRACKING_BASE_URL=http://localhost:3001
     volumes:
       - ./backend/static/clones:/app/static/clones
+      - backend_crashlogs:/app/logs
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      ldap:
-        condition: service_started
-      mailhog:
-        condition: service_started
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 30s
+      retries: 5
+      start_period: 120s
     networks:
       - app-network
 
-  # Frontend (Vite Dev Server)
+  # ── Frontend (Vite Dev — Port 3001 on host) ────────────────
   frontend:
     build:
       context: ./frontend
@@ -162,23 +122,22 @@ services:
     container_name: phishing-frontend
     restart: unless-stopped
     ports:
-      - "80:3000"
+      - "3001:80"
     environment:
-      - VITE_API_BASE_URL=/api
+      - VITE_API_URL=http://localhost:8080
       - CHOKIDAR_USEPOLLING=true
       - NODE_OPTIONS=--max-old-space-size=2048
     volumes:
       - ./frontend/src:/app/src
       - ./frontend/public:/app/public
     depends_on:
-      backend:
-        condition: service_healthy
+      backend: { condition: service_healthy }
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 30s
+      retries: 5
+      start_period: 120s
     networks:
       - app-network
 
@@ -190,4 +149,4 @@ volumes:
   postgres_data:
   ldap_data:
   ldap_config:
-  redis_data:
+  backend_crashlogs:

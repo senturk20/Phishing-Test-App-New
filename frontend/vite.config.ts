@@ -5,36 +5,40 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: '0.0.0.0',
-    port: 3000,
+    port: 80,
     strictPort: true,
+    // Proxy only routes that must reach the backend through Docker networking.
+    // API calls go direct from the browser to http://localhost:8080 (no proxy needed).
     proxy: {
-      // Tracking route (phishing click links)
+      // Tracking route — phishing click links (e.g. /t/abc123)
       '/t/': {
         target: 'http://backend:8080',
         changeOrigin: true,
       },
-      // Landing page preview (iframe)
-      '/api/landing-pages/preview/': {
+      // Phishing form submission — cloned page forms POST here
+      '/p/': {
         target: 'http://backend:8080',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
       },
-      // Static clone assets
+      // Static clone assets — CSS/JS/images for cloned landing pages
       '/static/': {
         target: 'http://backend:8080',
         changeOrigin: true,
       },
-      // Phishing form submission
-      '/api/p/': {
+      // Landing page preview — served in iframes
+      '/landing-pages/preview/': {
         target: 'http://backend:8080',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
       },
-      // All other API calls
-      '/api/': {
+      // Event tracking — phishing target interactions
+      '/events': {
         target: 'http://backend:8080',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+      // Legacy /api/events path used by DB-seeded landing page templates
+      '/api/events': {
+        target: 'http://backend:8080',
+        changeOrigin: true,
       },
     },
   },
