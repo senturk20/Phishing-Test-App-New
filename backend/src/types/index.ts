@@ -52,8 +52,10 @@ export interface Campaign {
 export interface CampaignStats {
   totalTargets: number;
   emailsSent: number;
+  opened: number;
   clicked: number;
   submitted: number;
+  openRate: number;
   clickRate: number;
   submitRate: number;
 }
@@ -67,7 +69,7 @@ export interface CampaignDetail extends Campaign {
 // EVENT TYPES
 // ============================================
 
-export type EventType = 'clicked' | 'submitted';
+export type EventType = 'opened' | 'clicked' | 'submitted';
 
 export interface CampaignEvent {
   id: string;
@@ -159,8 +161,10 @@ export interface DashboardStats {
   pausedCampaigns: number;
   totalRecipients: number;
   totalEmailsSent: number;
+  totalOpened: number;
   totalClicks: number;
   totalSubmissions: number;
+  overallOpenRate: number;
   overallClickRate: number;
   overallSubmitRate: number;
 }

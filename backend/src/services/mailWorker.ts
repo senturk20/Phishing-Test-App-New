@@ -25,6 +25,10 @@ export function startMailWorker(): void {
 
       console.log(`[MailWorker] Processing job ${job.id} | Campaign: ${campaignName} | To: ${recipientEmail}`);
 
+      // Anti-spam jitter: random delay 2-5 seconds before each send
+      const jitter = 2000 + Math.random() * 3000;
+      await new Promise<void>((resolve) => setTimeout(resolve, jitter));
+
       const success = await sendEmail({ to: recipientEmail, subject, html });
 
       if (success) {

@@ -13,11 +13,13 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     const events = memoryStore.events;
 
     const sentRecipients = recipients.filter((r) => r.status !== 'pending').length;
+    const openedTokens = new Set(events.filter((e) => e.type === 'opened').map((e) => e.recipientToken));
     const clickedTokens = new Set(events.filter((e) => e.type === 'clicked').map((e) => e.recipientToken));
     const submittedTokens = new Set(events.filter((e) => e.type === 'submitted').map((e) => e.recipientToken));
 
     const totalRecipients = recipients.length;
     const totalEmailsSent = sentRecipients;
+    const totalOpened = openedTokens.size;
     const totalClicks = clickedTokens.size;
     const totalSubmissions = submittedTokens.size;
 
@@ -29,8 +31,10 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       pausedCampaigns: campaigns.filter((c) => c.status === 'paused').length,
       totalRecipients,
       totalEmailsSent,
+      totalOpened,
       totalClicks,
       totalSubmissions,
+      overallOpenRate: totalEmailsSent > 0 ? (totalOpened / totalEmailsSent) * 100 : 0,
       overallClickRate: totalEmailsSent > 0 ? (totalClicks / totalEmailsSent) * 100 : 0,
       overallSubmitRate: totalEmailsSent > 0 ? (totalSubmissions / totalEmailsSent) * 100 : 0,
     };
@@ -46,14 +50,16 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       pausedCampaigns: 0,
       totalRecipients: 0,
       totalEmailsSent: 0,
+      totalOpened: 0,
       totalClicks: 0,
       totalSubmissions: 0,
+      overallOpenRate: 0,
       overallClickRate: 0,
       overallSubmitRate: 0,
     };
   }
 
-  const [campaignStats, recipientStats, clickStats, submitStats] = await Promise.all([
+  const [campaignStats, recipientStats, openStats, clickStats, submitStats] = await Promise.all([
     p.query(`
       SELECT
         COUNT(*) as total,
@@ -69,26 +75,30 @@ export async function getDashboardStats(): Promise<DashboardStats> {
         SUM(CASE WHEN status != 'pending' THEN 1 ELSE 0 END) as sent
       FROM recipients
     `),
+    p.query(`SELECT COUNT(DISTINCT recipient_token) as count FROM events WHERE type = 'opened'`),
     p.query(`SELECT COUNT(DISTINCT recipient_token) as count FROM events WHERE type = 'clicked'`),
     p.query(`SELECT COUNT(DISTINCT recipient_token) as count FROM events WHERE type = 'submitted'`),
   ]);
 
   const c = campaignStats.rows[0];
   const r = recipientStats.rows[0];
-  const totalEmailsSent = parseInt(r.sent, 10);
+  const totalEmailsSent = parseInt(r.sent || '0', 10);
+  const totalOpened = parseInt(openStats.rows[0].count, 10);
   const totalClicks = parseInt(clickStats.rows[0].count, 10);
   const totalSubmissions = parseInt(submitStats.rows[0].count, 10);
 
   return {
     totalCampaigns: parseInt(c.total, 10),
-    activeCampaigns: parseInt(c.active, 10),
-    completedCampaigns: parseInt(c.completed, 10),
-    draftCampaigns: parseInt(c.draft, 10),
-    pausedCampaigns: parseInt(c.paused, 10),
+    activeCampaigns: parseInt(c.active || '0', 10),
+    completedCampaigns: parseInt(c.completed || '0', 10),
+    draftCampaigns: parseInt(c.draft || '0', 10),
+    pausedCampaigns: parseInt(c.paused || '0', 10),
     totalRecipients: parseInt(r.total, 10),
     totalEmailsSent,
+    totalOpened,
     totalClicks,
     totalSubmissions,
+    overallOpenRate: totalEmailsSent > 0 ? (totalOpened / totalEmailsSent) * 100 : 0,
     overallClickRate: totalEmailsSent > 0 ? (totalClicks / totalEmailsSent) * 100 : 0,
     overallSubmitRate: totalEmailsSent > 0 ? (totalSubmissions / totalEmailsSent) * 100 : 0,
   };

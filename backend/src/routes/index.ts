@@ -10,3 +10,4 @@ export { default as queueRoutes } from './queueRoutes.js';
 export { default as authRoutes } from './authRoutes.js';
 export { default as clonerRoutes } from './clonerRoutes.js';
 export { default as phishingRoutes } from './phishingRoutes.js';
+export { default as pixelRoutes } from './pixelRoutes.js';

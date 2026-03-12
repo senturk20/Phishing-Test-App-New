@@ -1,5 +1,5 @@
 export type CampaignStatus = 'draft' | 'active' | 'completed' | 'paused';
-export type EventType = 'clicked' | 'submitted';
+export type EventType = 'opened' | 'clicked' | 'submitted';
 export type RecipientStatus = 'pending' | 'sent' | 'clicked' | 'submitted' | 'failed';
 export type Frequency = 'once' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly';
 export type SendingMode = 'all' | 'spread';
@@ -45,8 +45,10 @@ export interface CampaignEvent {
 export interface CampaignStats {
   totalTargets: number;
   emailsSent: number;
+  opened: number;
   clicked: number;
   submitted: number;
+  openRate: number;
   clickRate: number;
   submitRate: number;
 }
@@ -111,8 +113,10 @@ export interface DashboardStats {
   pausedCampaigns: number;
   totalRecipients: number;
   totalEmailsSent: number;
+  totalOpened: number;
   totalClicks: number;
   totalSubmissions: number;
+  overallOpenRate: number;
   overallClickRate: number;
   overallSubmitRate: number;
 }

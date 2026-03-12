@@ -21,6 +21,7 @@ import {
   authRoutes,
   clonerRoutes,
   phishingRoutes,
+  pixelRoutes,
 } from './routes/index.js';
 import {
   closeLdapConnection,
@@ -68,6 +69,11 @@ process.on('unhandledRejection', (reason) => {
 // ============================================
 
 const app = express();
+
+// ============================================
+// TRACKING PIXEL (before static files — dynamic route takes priority)
+// ============================================
+app.use('/static/images', pixelRoutes);
 
 // ============================================
 // STATIC FILES (for landing page clone assets)
@@ -280,6 +286,9 @@ async function startServer() {
         await pool.query(`ALTER TABLE recipients ADD COLUMN IF NOT EXISTS department VARCHAR(255) DEFAULT '';`);
         await pool.query(`ALTER TABLE recipients ADD COLUMN IF NOT EXISTS faculty VARCHAR(255) DEFAULT '';`);
         await pool.query(`ALTER TABLE recipients ADD COLUMN IF NOT EXISTS role VARCHAR(100) DEFAULT '';`);
+        // Add 'opened' to events type check constraint (for email open tracking)
+        await pool.query(`ALTER TABLE events DROP CONSTRAINT IF EXISTS events_type_check;`);
+        await pool.query(`ALTER TABLE events ADD CONSTRAINT events_type_check CHECK (type IN ('opened', 'clicked', 'submitted'));`);
         console.log('[Migration] Schema migrations applied successfully');
       }
     } catch (err) {

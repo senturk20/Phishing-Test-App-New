@@ -82,7 +82,7 @@ CREATE TABLE IF NOT EXISTS campaigns (
 CREATE TABLE IF NOT EXISTS events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     campaign_id UUID NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
-    type VARCHAR(50) NOT NULL CHECK (type IN ('clicked', 'submitted')),
+    type VARCHAR(50) NOT NULL CHECK (type IN ('opened', 'clicked', 'submitted')),
     recipient_token VARCHAR(255) NOT NULL,
     ip_address VARCHAR(45),
     user_agent TEXT,

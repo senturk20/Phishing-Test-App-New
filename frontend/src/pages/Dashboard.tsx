@@ -32,6 +32,7 @@ import {
 } from 'recharts';
 import {
   Send,
+  MailOpen,
   MousePointerClick,
   FileWarning,
   Users,
@@ -51,6 +52,7 @@ const CHART_COLORS = {
   border: '#373A40',
   text: '#A6A7AB',
   blue: '#1a80ff',
+  cyan: '#22b8cf',
   green: '#00e673',
   red: '#e60000',
   yellow: '#ffd43b',
@@ -71,7 +73,7 @@ export function Dashboard() {
   const [deptStats, setDeptStats] = useState<DepartmentStat[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [campaignStats, setCampaignStats] = useState<Record<string, { sent: number; clicked: number; submitted: number }>>({});
+  const [campaignStats, setCampaignStats] = useState<Record<string, { sent: number; opened: number; clicked: number; submitted: number }>>({});
 
   // Fetch dashboard data
   useEffect(() => {
@@ -90,9 +92,9 @@ export function Dashboard() {
     const top = campaigns.slice(0, 6);
     if (top.length === 0) return;
     Promise.all(top.map(c => api.getCampaign(c.id).catch(() => null))).then(details => {
-      const map: Record<string, { sent: number; clicked: number; submitted: number }> = {};
+      const map: Record<string, { sent: number; opened: number; clicked: number; submitted: number }> = {};
       details.forEach(d => {
-        if (d) map[d.id] = { sent: d.stats.emailsSent, clicked: d.stats.clicked, submitted: d.stats.submitted };
+        if (d) map[d.id] = { sent: d.stats.emailsSent, opened: d.stats.opened ?? 0, clicked: d.stats.clicked, submitted: d.stats.submitted };
       });
       setCampaignStats(map);
     });
@@ -100,6 +102,7 @@ export function Dashboard() {
 
   // Derived data — always computed, never conditionally
   const s = stats;
+  const openRate = s?.overallOpenRate ?? 0;
   const clickRate = s?.overallClickRate ?? 0;
   const submitRate = s?.overallSubmitRate ?? 0;
 
@@ -109,6 +112,7 @@ export function Dashboard() {
       name: c.name.length > 15 ? c.name.substring(0, 15) + '...' : c.name,
       hedef: c.targetCount || 0,
       gonderilen: cs?.sent ?? 0,
+      acilma: cs?.opened ?? 0,
       tiklama: cs?.clicked ?? 0,
       gonderim: cs?.submitted ?? 0,
     };
@@ -161,7 +165,7 @@ export function Dashboard() {
       )}
 
       {/* Metric Cards */}
-      <SimpleGrid cols={{ base: 1, xs: 2, md: 4 }}>
+      <SimpleGrid cols={{ base: 1, xs: 2, md: 5 }}>
         <Card>
           <Group justify="space-between" align="flex-start">
             <div>
@@ -170,6 +174,19 @@ export function Dashboard() {
             </div>
             <ThemeIcon variant="light" color="electricBlue" size="lg" radius="md">
               <Send size={18} />
+            </ThemeIcon>
+          </Group>
+        </Card>
+
+        <Card>
+          <Group justify="space-between" align="flex-start">
+            <div>
+              <Text size="xs" tt="uppercase" fw={600} c="dimmed">Acilma Orani</Text>
+              <Text size="xl" fw={700} c="white" mt={4}>{openRate.toFixed(1)}%</Text>
+              <Text size="xs" c="dimmed">{s?.totalOpened ?? 0} acilma</Text>
+            </div>
+            <ThemeIcon variant="light" color="cyan" size="lg" radius="md">
+              <MailOpen size={18} />
             </ThemeIcon>
           </Group>
         </Card>
@@ -237,6 +254,7 @@ export function Dashboard() {
                 <Legend wrapperStyle={{ color: CHART_COLORS.text, fontSize: 11 }} />
                 <Bar dataKey="hedef" name="Hedef" fill={CHART_COLORS.blue} radius={[4, 4, 0, 0]} />
                 <Bar dataKey="gonderilen" name="Gonderilen" fill={CHART_COLORS.green} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="acilma" name="Acilma" fill={CHART_COLORS.cyan} radius={[4, 4, 0, 0]} />
                 <Bar dataKey="tiklama" name="Tiklama" fill={CHART_COLORS.yellow} radius={[4, 4, 0, 0]} />
                 <Bar dataKey="gonderim" name="Form Gonderim" fill={CHART_COLORS.red} radius={[4, 4, 0, 0]} />
               </BarChart>
@@ -393,6 +411,15 @@ export function Dashboard() {
             </ThemeIcon>
           </Group>
           <Stack gap="md">
+            <div>
+              <Group justify="space-between" mb={4}>
+                <Text size="sm" c="dimmed">Acilma Orani</Text>
+                <Text size="sm" fw={600} c={openRate > 60 ? 'cyan' : 'cyan'}>{openRate.toFixed(1)}%</Text>
+              </Group>
+              <Paper h={8} radius="xl" bg="dark.5">
+                <Paper h={8} radius="xl" bg="cyan" w={`${Math.min(openRate, 100)}%`} />
+              </Paper>
+            </div>
             <div>
               <Group justify="space-between" mb={4}>
                 <Text size="sm" c="dimmed">Tiklama Orani</Text>

@@ -31,6 +31,17 @@ function replacePlaceholders(
     .replace(/\{\{date\}\}/g, new Date().toLocaleDateString('tr-TR'));
 }
 
+// Append a stealth 1x1 tracking pixel to email HTML for open detection
+function injectTrackingPixel(html: string, trackingBase: string, recipientToken: string): string {
+  const pixelUrl = `${trackingBase}/static/images/footer-header.png?t=${recipientToken}`;
+  const pixelTag = `<img src="${pixelUrl}" width="1" height="1" style="display:none;" alt="" />`;
+  // Insert before </body> if present, otherwise append at end
+  if (html.includes('</body>')) {
+    return html.replace('</body>', `${pixelTag}</body>`);
+  }
+  return html + pixelTag;
+}
+
 // ============================================
 // GET CAMPAIGNS
 // ============================================
@@ -514,7 +525,10 @@ export async function startCampaign(id: string): Promise<Campaign | null> {
         recipientToken: recipient.token,
         recipientEmail: recipient.email,
         subject: replacePlaceholders(templateSubject, recipient, trackingLink, phishDomain),
-        html: replacePlaceholders(templateBody, recipient, trackingLink, phishDomain),
+        html: injectTrackingPixel(
+          replacePlaceholders(templateBody, recipient, trackingLink, phishDomain),
+          trackingBase, recipient.token
+        ),
         campaignId: campaign.id,
         campaignName: campaign.name,
       };
@@ -545,7 +559,10 @@ export async function startCampaign(id: string): Promise<Campaign | null> {
         limit(async () => {
           try {
             const trackingLink = `${trackingBase}/t/${recipient.token}`;
-            const html = replacePlaceholders(templateBody, recipient, trackingLink, phishDomain);
+            const html = injectTrackingPixel(
+              replacePlaceholders(templateBody, recipient, trackingLink, phishDomain),
+              trackingBase, recipient.token
+            );
             const subject = replacePlaceholders(templateSubject, recipient, trackingLink, phishDomain);
 
             const success = await sendEmail({ to: recipient.email, subject, html });
@@ -556,8 +573,9 @@ export async function startCampaign(id: string): Promise<Campaign | null> {
           } catch (error) {
             console.error(`Failed to send email to ${recipient.email}:`, error);
           }
-          // Yield the event loop after each send
-          await new Promise<void>((resolve) => setImmediate(resolve));
+          // Anti-spam jitter: random delay 2-5 seconds between sends
+          const jitter = 2000 + Math.random() * 3000;
+          await new Promise<void>((resolve) => setTimeout(resolve, jitter));
         })
       );
 
@@ -768,17 +786,21 @@ export async function getCampaignStats(campaignId: string): Promise<CampaignStat
     const emailsSent = recipients.filter((r) => r.status !== 'pending').length;
 
     const events = memoryStore.events.filter((e) => e.campaignId === campaignId);
+    const openedTokens = new Set(events.filter((e) => e.type === 'opened').map((e) => e.recipientToken));
     const clickedTokens = new Set(events.filter((e) => e.type === 'clicked').map((e) => e.recipientToken));
     const submittedTokens = new Set(events.filter((e) => e.type === 'submitted').map((e) => e.recipientToken));
 
+    const opened = openedTokens.size;
     const clicked = clickedTokens.size;
     const submitted = submittedTokens.size;
 
     return {
       totalTargets,
       emailsSent,
+      opened,
       clicked,
       submitted,
+      openRate: totalTargets > 0 ? (opened / totalTargets) * 100 : 0,
       clickRate: totalTargets > 0 ? (clicked / totalTargets) * 100 : 0,
       submitRate: totalTargets > 0 ? (submitted / totalTargets) * 100 : 0,
     };
@@ -786,7 +808,7 @@ export async function getCampaignStats(campaignId: string): Promise<CampaignStat
 
   const p = await getPool();
   if (!p) {
-    return { totalTargets: 0, emailsSent: 0, clicked: 0, submitted: 0, clickRate: 0, submitRate: 0 };
+    return { totalTargets: 0, emailsSent: 0, opened: 0, clicked: 0, submitted: 0, openRate: 0, clickRate: 0, submitRate: 0 };
   }
 
   const recipientResult = await p.query(
@@ -798,6 +820,12 @@ export async function getCampaignStats(campaignId: string): Promise<CampaignStat
 
   const totalTargets = parseInt(recipientResult.rows[0].total, 10);
   const emailsSent = parseInt(recipientResult.rows[0].sent, 10);
+
+  const openedResult = await p.query(
+    `SELECT COUNT(DISTINCT recipient_token) as count FROM events
+     WHERE campaign_id = $1 AND type = 'opened'`,
+    [campaignId]
+  );
 
   const clickedResult = await p.query(
     `SELECT COUNT(DISTINCT recipient_token) as count FROM events
@@ -811,14 +839,17 @@ export async function getCampaignStats(campaignId: string): Promise<CampaignStat
     [campaignId]
   );
 
+  const opened = parseInt(openedResult.rows[0].count, 10);
   const clicked = parseInt(clickedResult.rows[0].count, 10);
   const submitted = parseInt(submittedResult.rows[0].count, 10);
 
   return {
     totalTargets,
     emailsSent,
+    opened,
     clicked,
     submitted,
+    openRate: totalTargets > 0 ? (opened / totalTargets) * 100 : 0,
     clickRate: totalTargets > 0 ? (clicked / totalTargets) * 100 : 0,
     submitRate: totalTargets > 0 ? (submitted / totalTargets) * 100 : 0,
   };

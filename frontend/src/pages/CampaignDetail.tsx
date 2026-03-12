@@ -32,6 +32,7 @@ import {
   RotateCw,
   Users,
   Send,
+  MailOpen,
   MousePointerClick,
   FileWarning,
   RefreshCw,
@@ -354,7 +355,7 @@ export function CampaignDetail() {
       </Group>
 
       {/* Stats Grid */}
-      <SimpleGrid cols={{ base: 1, xs: 2, md: 4 }}>
+      <SimpleGrid cols={{ base: 1, xs: 2, md: 5 }}>
         <Card>
           <Group justify="space-between" align="flex-start">
             <div>
@@ -371,6 +372,16 @@ export function CampaignDetail() {
               <Text size="xl" fw={700} c="white" mt={4}>{stats.emailsSent}</Text>
             </div>
             <ThemeIcon variant="light" color="cyberGreen" size="lg" radius="md"><Send size={18} /></ThemeIcon>
+          </Group>
+        </Card>
+        <Card>
+          <Group justify="space-between" align="flex-start">
+            <div>
+              <Text size="xs" tt="uppercase" fw={600} c="dimmed">Acilma</Text>
+              <Text size="xl" fw={700} c="white" mt={4}>{stats.opened ?? 0}</Text>
+              <Text size="xs" c="dimmed">{(stats.openRate ?? 0).toFixed(1)}%</Text>
+            </div>
+            <ThemeIcon variant="light" color="cyan" size="lg" radius="md"><MailOpen size={18} /></ThemeIcon>
           </Group>
         </Card>
         <Card>
