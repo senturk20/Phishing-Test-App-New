@@ -6,7 +6,9 @@ import type {
   EmailTemplate,
   LandingPage,
   DashboardStats,
+  DepartmentStat,
   LdapUser,
+  LdapFaculty,
   LdapSyncResult,
   CampaignFormData,
 } from './types';
@@ -82,6 +84,7 @@ export const api = {
 
   // Dashboard
   getDashboardStats: () => request<DashboardStats>('/dashboard/stats'),
+  getDepartmentStats: () => request<DepartmentStat[]>('/dashboard/departments'),
 
   // Campaigns
   getCampaigns: () => request<Campaign[]>('/campaigns'),
@@ -220,9 +223,15 @@ export const api = {
   testLdapConnection: () =>
     request<{ success: boolean; message: string }>('/ldap/test'),
 
-  getLdapUsers: () =>
-    request<{ users: LdapUser[]; count: number }>('/ldap/users'),
+  getLdapUsers: (faculty?: string) =>
+    request<{ users: LdapUser[]; count: number }>(`/ldap/users${faculty ? `?faculty=${faculty}` : ''}`),
 
-  syncLdapUsers: (campaignId: string) =>
-    request<LdapSyncResult>(`/ldap/sync/${campaignId}`, { method: 'POST' }),
+  getLdapFaculties: () =>
+    request<{ faculties: LdapFaculty[]; total: number }>('/ldap/faculties'),
+
+  syncLdapUsers: (campaignId: string, faculty?: string) =>
+    request<LdapSyncResult>(`/ldap/sync/${campaignId}`, {
+      method: 'POST',
+      body: JSON.stringify({ faculty: faculty || 'all' }),
+    }),
 };

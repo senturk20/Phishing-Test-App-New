@@ -81,7 +81,7 @@ export async function ldapHealthCheck(): Promise<void> {
   console.log(`[LDAP]   Base DN       : ${baseDn}`);
   console.log(`[LDAP]   Users OU      : ${usersOu || '(root of base DN)'}`);
   console.log(`[LDAP]   User Filter   : ${userFilter}`);
-  console.log(`[LDAP]   Attr Mapping  : email=${mapping.email}, firstName=${mapping.firstName}, lastName=${mapping.lastName}, username=${mapping.username}, fullName=${mapping.fullName}`);
+  console.log(`[LDAP]   Attr Mapping  : email=${mapping.email}, firstName=${mapping.firstName}, lastName=${mapping.lastName}, username=${mapping.username}, fullName=${mapping.fullName}, department=${mapping.department}, title=${mapping.title}`);
 
   // 1. Test bind
   try {
@@ -177,6 +177,9 @@ export interface LdapUser {
   lastName: string;
   username: string;
   fullName: string;
+  department: string;
+  title: string;       // Student | Staff
+  faculty: string;     // Derived from OU in DN (engineering, humanities, rectorate)
 }
 
 // ============================================
@@ -224,13 +227,21 @@ export async function searchLdapUsers(): Promise<LdapUser[]> {
 
         const email = getAttribute(mapping.email);
         if (email) {
+          // Extract faculty from the DN path (e.g. ou=engineering,ou=users,... → engineering)
+          const dnStr = obj.objectName;
+          const ouMatch = dnStr.match(/ou=(\w+),ou=users/i);
+          const faculty = ouMatch ? ouMatch[1] : '';
+
           users.push({
-            dn: obj.objectName,
+            dn: dnStr,
             email,
-            firstName: getAttribute(mapping.firstName),
-            lastName:  getAttribute(mapping.lastName),
-            username:  getAttribute(mapping.username),
-            fullName:  getAttribute(mapping.fullName),
+            firstName:  getAttribute(mapping.firstName),
+            lastName:   getAttribute(mapping.lastName),
+            username:   getAttribute(mapping.username),
+            fullName:   getAttribute(mapping.fullName),
+            department: getAttribute(mapping.department),
+            title:      getAttribute(mapping.title),
+            faculty,
           });
         }
       });
@@ -340,6 +351,9 @@ export async function syncLdapUsersToCampaign(campaignId: string): Promise<SyncR
         email: user.email,
         firstName: user.firstName || user.fullName || 'Unknown',
         lastName: user.lastName || 'Unknown',
+        department: user.department || '',
+        faculty: user.faculty || '',
+        role: user.title || '',
         token: generateToken(),
         status: 'pending',
         createdAt: now,
@@ -361,8 +375,8 @@ export async function syncLdapUsersToCampaign(campaignId: string): Promise<SyncR
     for (const user of ldapUsers) {
       try {
         const insertResult = await p.query(
-          `INSERT INTO recipients (campaign_id, email, first_name, last_name, token)
-           VALUES ($1, $2, $3, $4, $5)
+          `INSERT INTO recipients (campaign_id, email, first_name, last_name, department, faculty, role, token)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
            ON CONFLICT (campaign_id, email) DO NOTHING
            RETURNING id`,
           [
@@ -370,6 +384,9 @@ export async function syncLdapUsersToCampaign(campaignId: string): Promise<SyncR
             user.email,
             user.firstName || user.fullName || 'Unknown',
             user.lastName || 'Unknown',
+            user.department || '',
+            user.faculty || '',
+            user.title || '',
             generateToken(),
           ]
         );
@@ -408,6 +425,133 @@ export async function syncLdapUsersToCampaign(campaignId: string): Promise<SyncR
 // ============================================
 // GET LDAP USERS (Preview without syncing)
 // ============================================
+
+// ============================================
+// SEARCH LDAP USERS BY FACULTY (targeted sync)
+// ============================================
+
+export async function searchLdapUsersByFaculty(faculty: string): Promise<LdapUser[]> {
+  const allUsers = await searchLdapUsers();
+  if (faculty === 'all' || !faculty) return allUsers;
+  return allUsers.filter(u => u.faculty.toLowerCase() === faculty.toLowerCase());
+}
+
+// ============================================
+// SYNC LDAP USERS BY FACULTY TO CAMPAIGN
+// ============================================
+
+export async function syncLdapFacultyToCampaign(campaignId: string, faculty: string): Promise<SyncResult> {
+  const result: SyncResult = {
+    success: true,
+    totalFound: 0,
+    synced: 0,
+    skipped: 0,
+    errors: 0,
+    connectionOk: false,
+    message: '',
+    details: [],
+  };
+
+  let ldapUsers: LdapUser[];
+  try {
+    ldapUsers = await searchLdapUsersByFaculty(faculty);
+    result.connectionOk = true;
+    result.totalFound = ldapUsers.length;
+  } catch (error) {
+    result.success = false;
+    result.connectionOk = false;
+    result.message = error instanceof Error
+      ? `LDAP connection/search failed: ${error.message}`
+      : 'LDAP connection/search failed: Unknown error';
+    throw error;
+  }
+
+  if (ldapUsers.length === 0) {
+    result.message = `No users found for faculty "${faculty}".`;
+    return result;
+  }
+
+  if (config.useMemoryDb) {
+    const now = new Date();
+    const existingEmails = new Set(
+      memoryStore.recipients
+        .filter((r) => r.campaignId === campaignId)
+        .map((r) => r.email.toLowerCase())
+    );
+
+    for (const user of ldapUsers) {
+      const email = user.email.toLowerCase();
+      if (existingEmails.has(email)) {
+        result.skipped++;
+        result.details.push({ email: user.email, status: 'skipped', message: 'Already exists' });
+        continue;
+      }
+
+      const recipient: Recipient = {
+        id: generateId(),
+        campaignId,
+        email: user.email,
+        firstName: user.firstName || user.fullName || 'Unknown',
+        lastName: user.lastName || 'Unknown',
+        department: user.department || '',
+        faculty: user.faculty || '',
+        role: user.title || '',
+        token: generateToken(),
+        status: 'pending',
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      memoryStore.recipients.push(recipient);
+      existingEmails.add(email);
+      result.synced++;
+      result.details.push({ email: user.email, status: 'synced' });
+    }
+  } else {
+    const p = await getPool();
+    if (!p) throw new Error('Database not available');
+
+    for (const user of ldapUsers) {
+      try {
+        const insertResult = await p.query(
+          `INSERT INTO recipients (campaign_id, email, first_name, last_name, department, faculty, role, token)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+           ON CONFLICT (campaign_id, email) DO NOTHING
+           RETURNING id`,
+          [
+            campaignId,
+            user.email,
+            user.firstName || user.fullName || 'Unknown',
+            user.lastName || 'Unknown',
+            user.department || '',
+            user.faculty || '',
+            user.title || '',
+            generateToken(),
+          ]
+        );
+
+        if (insertResult.rows.length > 0) {
+          result.synced++;
+          result.details.push({ email: user.email, status: 'synced' });
+        } else {
+          result.skipped++;
+          result.details.push({ email: user.email, status: 'skipped', message: 'Already exists' });
+        }
+      } catch (dbErr) {
+        result.errors++;
+        result.details.push({
+          email: user.email,
+          status: 'error',
+          message: dbErr instanceof Error ? dbErr.message : 'Unknown error',
+        });
+      }
+    }
+  }
+
+  result.message = `Faculty "${faculty}" sync: ${result.synced} synced, ${result.skipped} skipped, ${result.errors} errors`;
+  console.log(`[LDAP Sync] ${result.message}`);
+  return result;
+}
 
 export async function getLdapUsersPreview(): Promise<{
   users: LdapUser[];

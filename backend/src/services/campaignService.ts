@@ -37,16 +37,22 @@ function replacePlaceholders(
 
 export async function getCampaigns(): Promise<Campaign[]> {
   if (config.useMemoryDb) {
-    return [...memoryStore.campaigns].sort(
-      (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
-    );
+    return [...memoryStore.campaigns]
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .map(c => ({
+        ...c,
+        targetCount: memoryStore.recipients.filter(r => r.campaignId === c.id).length || c.targetCount,
+      }));
   }
 
   const p = await getPool();
   if (!p) return [];
 
   const result = await p.query(
-    `SELECT * FROM campaigns ORDER BY created_at DESC`
+    `SELECT c.*,
+       (SELECT COUNT(*) FROM recipients r WHERE r.campaign_id = c.id) AS actual_recipient_count
+     FROM campaigns c
+     ORDER BY c.created_at DESC`
   );
 
   return result.rows.map((row) => ({
@@ -54,7 +60,7 @@ export async function getCampaigns(): Promise<Campaign[]> {
     name: row.name,
     description: row.description,
     status: row.status,
-    targetCount: row.target_count,
+    targetCount: parseInt(row.actual_recipient_count, 10) || row.target_count || 0,
     frequency: row.frequency,
     startDate: row.start_date,
     startTime: row.start_time,

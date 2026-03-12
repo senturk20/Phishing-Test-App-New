@@ -44,6 +44,9 @@ export const config = {
   // Tracking URL base (where phishing links point to)
   trackingBaseUrl: process.env.TRACKING_BASE_URL || 'http://localhost',
 
+  // Final redirect URL after phishing form submission (maintains illusion)
+  finalRedirectUrl: process.env.FINAL_REDIRECT_URL || 'https://www.estu.edu.tr',
+
   // LDAP Configuration
   ldap: {
     url: process.env.LDAP_URL || 'ldap://localhost:389',
@@ -61,11 +64,13 @@ export const config = {
     //   Active Directory:   mail, givenName, sn, sAMAccountName
     //   Custom schemas:     email, firstName, lastName, username
     mapping: {
-      email:     process.env.LDAP_ATTR_EMAIL     || 'mail',
-      firstName: process.env.LDAP_ATTR_FIRSTNAME || 'givenName',
-      lastName:  process.env.LDAP_ATTR_LASTNAME  || 'sn',
-      username:  process.env.LDAP_ATTR_USERNAME  || 'uid',
-      fullName:  process.env.LDAP_ATTR_FULLNAME  || 'cn',
+      email:      process.env.LDAP_ATTR_EMAIL      || 'mail',
+      firstName:  process.env.LDAP_ATTR_FIRSTNAME  || 'givenName',
+      lastName:   process.env.LDAP_ATTR_LASTNAME   || 'sn',
+      username:   process.env.LDAP_ATTR_USERNAME   || 'uid',
+      fullName:   process.env.LDAP_ATTR_FULLNAME   || 'cn',
+      department: process.env.LDAP_ATTR_DEPARTMENT || 'departmentNumber',
+      title:      process.env.LDAP_ATTR_TITLE      || 'title',
     },
   },
 };

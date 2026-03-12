@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # ── PostgreSQL ──────────────────────────────────────────────
   postgres:
@@ -37,6 +35,7 @@ services:
     volumes:
       - ldap_data:/var/lib/ldap
       - ldap_config:/etc/ldap/slapd.d
+      - ./ldap/init.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/init.ldif:ro
     ports:
       - "389:389"
     command: --copy-service
@@ -99,6 +98,7 @@ services:
       - LDAP_BASE_DN=dc=university,dc=edu,dc=tr
       - LDAP_USERS_OU=ou=users
       - TRACKING_BASE_URL=http://localhost:3001
+      - FINAL_REDIRECT_URL=${FINAL_REDIRECT_URL:-https://www.estu.edu.tr}
     volumes:
       - ./backend/static/clones:/app/static/clones
       - backend_crashlogs:/app/logs

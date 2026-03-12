@@ -80,8 +80,14 @@ export {
   testLdapConnection,
   ldapHealthCheck,
   searchLdapUsers,
+  searchLdapUsersByFaculty,
   syncLdapUsersToCampaign,
+  syncLdapFacultyToCampaign,
   getLdapUsersPreview,
   closeLdapConnection,
 } from './ldapService.js';
 export type { LdapUser, SyncResult } from './ldapService.js';
+
+// Dashboard Department Stats
+export { getDepartmentStats } from './dashboardService.js';
+export type { DepartmentStat } from '../types/index.js';

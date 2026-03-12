@@ -17,7 +17,7 @@ export async function getRecipientsByCampaign(campaignId: string): Promise<Recip
   if (!p) return [];
 
   const result = await p.query(
-    `SELECT id, campaign_id, email, first_name, last_name, token, status,
+    `SELECT id, campaign_id, email, first_name, last_name, department, faculty, role, token, status,
             sent_at, clicked_at, submitted_at, created_at, updated_at
      FROM recipients WHERE campaign_id = $1 ORDER BY created_at ASC`,
     [campaignId]
@@ -29,6 +29,9 @@ export async function getRecipientsByCampaign(campaignId: string): Promise<Recip
     email: row.email,
     firstName: row.first_name,
     lastName: row.last_name,
+    department: row.department || '',
+    faculty: row.faculty || '',
+    role: row.role || '',
     token: row.token,
     status: row.status,
     sentAt: row.sent_at ?? undefined,
@@ -59,6 +62,9 @@ export async function createRecipient(data: {
       email: data.email,
       firstName: data.firstName,
       lastName: data.lastName,
+      department: '',
+      faculty: '',
+      role: '',
       token,
       status: 'pending',
       createdAt: now,
@@ -75,7 +81,7 @@ export async function createRecipient(data: {
   const result = await p.query(
     `INSERT INTO recipients (campaign_id, email, first_name, last_name, token)
      VALUES ($1, $2, $3, $4, $5)
-     RETURNING id, campaign_id, email, first_name, last_name, token, status,
+     RETURNING id, campaign_id, email, first_name, last_name, department, faculty, role, token, status,
                sent_at, clicked_at, submitted_at, created_at, updated_at`,
     [data.campaignId, data.email, data.firstName, data.lastName, token]
   );
@@ -89,6 +95,9 @@ export async function createRecipient(data: {
     email: row.email,
     firstName: row.first_name,
     lastName: row.last_name,
+    department: row.department || '',
+    faculty: row.faculty || '',
+    role: row.role || '',
     token: row.token,
     status: row.status,
     sentAt: row.sent_at ?? undefined,
@@ -116,6 +125,9 @@ export async function createRecipientsBulk(
         email: r.email,
         firstName: r.firstName,
         lastName: r.lastName,
+        department: '',
+        faculty: '',
+        role: '',
         token: generateToken(),
         status: 'pending',
         createdAt: now,
@@ -184,7 +196,7 @@ export async function updateRecipientStatus(
   const result = await p.query(
     `UPDATE recipients SET status = $1, updated_at = NOW() ${extraFields}
      WHERE token = $2
-     RETURNING id, campaign_id, email, first_name, last_name, token, status,
+     RETURNING id, campaign_id, email, first_name, last_name, department, faculty, role, token, status,
                sent_at, clicked_at, submitted_at, created_at, updated_at`,
     [status, token]
   );
@@ -198,6 +210,9 @@ export async function updateRecipientStatus(
     email: row.email,
     firstName: row.first_name,
     lastName: row.last_name,
+    department: row.department || '',
+    faculty: row.faculty || '',
+    role: row.role || '',
     token: row.token,
     status: row.status,
     sentAt: row.sent_at ?? undefined,
@@ -240,7 +255,7 @@ export async function getRecipientByToken(token: string): Promise<Recipient | nu
   if (!p) return null;
 
   const result = await p.query(
-    `SELECT id, campaign_id, email, first_name, last_name, token, status,
+    `SELECT id, campaign_id, email, first_name, last_name, department, faculty, role, token, status,
             sent_at, clicked_at, submitted_at, created_at, updated_at
      FROM recipients WHERE token = $1`,
     [token]
@@ -255,6 +270,9 @@ export async function getRecipientByToken(token: string): Promise<Recipient | nu
     email: row.email,
     firstName: row.first_name,
     lastName: row.last_name,
+    department: row.department || '',
+    faculty: row.faculty || '',
+    role: row.role || '',
     token: row.token,
     status: row.status,
     sentAt: row.sent_at ?? undefined,

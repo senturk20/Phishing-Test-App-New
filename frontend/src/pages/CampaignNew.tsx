@@ -25,7 +25,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { api } from '../api';
-import type { Frequency, SendingMode, EmailTemplate, LandingPage } from '../types';
+import type { Frequency, SendingMode, EmailTemplate, LandingPage, LdapFaculty } from '../types';
 
 const CATEGORIES = [
   { value: 'it', label: 'IT' },
@@ -41,14 +41,12 @@ const DOMAINS = [
   { value: 'mail-update.org', label: 'mail-update.org' },
 ];
 
-const TARGET_GROUPS = [
-  { value: '', label: '-- Kullanici Grubu Secin --' },
-  { value: 'all', label: 'Tum Kullanicilar' },
-  { value: 'it', label: 'IT Departmani' },
-  { value: 'hr', label: 'Insan Kaynaklari' },
-  { value: 'finance', label: 'Finans' },
-  { value: 'management', label: 'Yonetim' },
-];
+const FACULTY_LABELS: Record<string, string> = {
+  engineering: 'Muhendislik Fakultesi',
+  humanities: 'Insan ve Toplum Bilimleri',
+  rectorate: 'Rektorluk',
+  all: 'Tum Fakulteler',
+};
 
 const WEEKDAYS = [
   { value: 'sun', label: 'Paz' },
@@ -74,6 +72,7 @@ export function CampaignNew() {
   const [error, setError] = useState<string | null>(null);
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [landingPages, setLandingPages] = useState<LandingPage[]>([]);
+  const [faculties, setFaculties] = useState<LdapFaculty[]>([]);
 
   const [form, setForm] = useState({
     name: '',
@@ -105,12 +104,14 @@ export function CampaignNew() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [templatesData, landingPagesData] = await Promise.all([
+        const [templatesData, landingPagesData, facultiesData] = await Promise.all([
           api.getTemplates(),
           api.getLandingPages(),
+          api.getLdapFaculties().catch(() => ({ faculties: [], total: 0 })),
         ]);
         setTemplates(templatesData);
         setLandingPages(landingPagesData);
+        setFaculties(facultiesData.faculties);
 
         const landingPageId = searchParams.get('landingPageId');
         if (landingPageId) updateForm('landingPageId', landingPageId);
@@ -236,8 +237,16 @@ export function CampaignNew() {
                 disabled={loading}
               />
               <Select
-                label="Hedef Grup"
-                data={TARGET_GROUPS}
+                label="Hedef Fakulte / Departman"
+                placeholder="-- Hedef Fakulte Secin --"
+                data={[
+                  { value: '', label: '-- Hedef Fakulte Secin --' },
+                  { value: 'all', label: `Tum Fakulteler (${faculties.reduce((s, f) => s + f.count, 0)} kisi)` },
+                  ...faculties.map(f => ({
+                    value: f.name,
+                    label: `${FACULTY_LABELS[f.name] || f.name} (${f.count} kisi)`,
+                  })),
+                ]}
                 value={form.targetGroupId}
                 onChange={v => updateForm('targetGroupId', v || '')}
                 disabled={loading}

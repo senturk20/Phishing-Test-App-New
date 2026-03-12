@@ -276,6 +276,10 @@ async function startServer() {
         await pool.query(`ALTER TABLE landing_pages ADD COLUMN IF NOT EXISTS slug VARCHAR(255);`);
         await pool.query(`ALTER TABLE landing_pages ADD COLUMN IF NOT EXISTS original_url TEXT DEFAULT '';`);
         await pool.query(`ALTER TABLE landing_pages ADD COLUMN IF NOT EXISTS is_cloned BOOLEAN DEFAULT false;`);
+        // Department-based risk assessment columns
+        await pool.query(`ALTER TABLE recipients ADD COLUMN IF NOT EXISTS department VARCHAR(255) DEFAULT '';`);
+        await pool.query(`ALTER TABLE recipients ADD COLUMN IF NOT EXISTS faculty VARCHAR(255) DEFAULT '';`);
+        await pool.query(`ALTER TABLE recipients ADD COLUMN IF NOT EXISTS role VARCHAR(100) DEFAULT '';`);
         console.log('[Migration] Schema migrations applied successfully');
       }
     } catch (err) {

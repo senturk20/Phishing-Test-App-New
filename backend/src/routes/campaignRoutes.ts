@@ -69,6 +69,7 @@ router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
     const campaigns = await getCampaigns();
     res.json(campaigns);
   } catch (err) {
+    console.error('[getCampaigns] Failed to fetch campaigns:', err);
     next(err);
   }
 });

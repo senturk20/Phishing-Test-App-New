@@ -103,6 +103,10 @@ CREATE TABLE IF NOT EXISTS recipients (
     sent_at TIMESTAMP WITH TIME ZONE,
     clicked_at TIMESTAMP WITH TIME ZONE,
     submitted_at TIMESTAMP WITH TIME ZONE,
+    -- Department-based risk assessment fields (populated from LDAP)
+    department VARCHAR(255) DEFAULT '',
+    faculty VARCHAR(255) DEFAULT '',
+    role VARCHAR(100) DEFAULT '',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     -- Unique constraint for LDAP sync (same email can be in different campaigns)

@@ -2,7 +2,10 @@
 # from LDAP_DOMAIN and LDAP_ADMIN_PASSWORD environment variables.
 # Do NOT include them here — the LDIF loader aborts on duplicate entries.
 
-# Organizational Units
+# ============================================
+# ORGANIZATIONAL UNITS
+# ============================================
+
 dn: ou=users,dc=university,dc=edu,dc=tr
 objectClass: organizationalUnit
 ou: users
@@ -11,8 +14,27 @@ dn: ou=groups,dc=university,dc=edu,dc=tr
 objectClass: organizationalUnit
 ou: groups
 
-# Sample Users
-dn: uid=ahmet.yilmaz,ou=users,dc=university,dc=edu,dc=tr
+# Faculty-level OUs under users
+dn: ou=engineering,ou=users,dc=university,dc=edu,dc=tr
+objectClass: organizationalUnit
+ou: engineering
+description: Muhendislik Fakultesi
+
+dn: ou=humanities,ou=users,dc=university,dc=edu,dc=tr
+objectClass: organizationalUnit
+ou: humanities
+description: Insan ve Toplum Bilimleri Fakultesi
+
+dn: ou=rectorate,ou=users,dc=university,dc=edu,dc=tr
+objectClass: organizationalUnit
+ou: rectorate
+description: Rektorluk
+
+# ============================================
+# ENGINEERING FACULTY (8 users)
+# ============================================
+
+dn: uid=ahmet.yilmaz,ou=engineering,ou=users,dc=university,dc=edu,dc=tr
 objectClass: inetOrgPerson
 objectClass: posixAccount
 objectClass: shadowAccount
@@ -21,28 +43,138 @@ sn: Yilmaz
 givenName: Ahmet
 cn: Ahmet Yilmaz
 displayName: Ahmet Yilmaz
+title: Staff
+departmentNumber: Bilgisayar Muhendisligi
 uidNumber: 1001
 gidNumber: 1001
 userPassword: password123
 homeDirectory: /home/ahmet.yilmaz
 mail: ahmet.yilmaz@university.edu.tr
 
-dn: uid=mehmet.demir,ou=users,dc=university,dc=edu,dc=tr
+dn: uid=elif.demir,ou=engineering,ou=users,dc=university,dc=edu,dc=tr
 objectClass: inetOrgPerson
 objectClass: posixAccount
 objectClass: shadowAccount
-uid: mehmet.demir
+uid: elif.demir
 sn: Demir
-givenName: Mehmet
-cn: Mehmet Demir
-displayName: Mehmet Demir
+givenName: Elif
+cn: Elif Demir
+displayName: Elif Demir
+title: Student
+departmentNumber: Bilgisayar Muhendisligi
 uidNumber: 1002
 gidNumber: 1001
 userPassword: password123
-homeDirectory: /home/mehmet.demir
-mail: mehmet.demir@university.edu.tr
+homeDirectory: /home/elif.demir
+mail: elif.demir@university.edu.tr
 
-dn: uid=ayse.kaya,ou=users,dc=university,dc=edu,dc=tr
+dn: uid=can.ozkan,ou=engineering,ou=users,dc=university,dc=edu,dc=tr
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: can.ozkan
+sn: Ozkan
+givenName: Can
+cn: Can Ozkan
+displayName: Can Ozkan
+title: Staff
+departmentNumber: Elektrik-Elektronik Muhendisligi
+uidNumber: 1003
+gidNumber: 1001
+userPassword: password123
+homeDirectory: /home/can.ozkan
+mail: can.ozkan@university.edu.tr
+
+dn: uid=selin.aksoy,ou=engineering,ou=users,dc=university,dc=edu,dc=tr
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: selin.aksoy
+sn: Aksoy
+givenName: Selin
+cn: Selin Aksoy
+displayName: Selin Aksoy
+title: Student
+departmentNumber: Elektrik-Elektronik Muhendisligi
+uidNumber: 1004
+gidNumber: 1001
+userPassword: password123
+homeDirectory: /home/selin.aksoy
+mail: selin.aksoy@university.edu.tr
+
+dn: uid=burak.kara,ou=engineering,ou=users,dc=university,dc=edu,dc=tr
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: burak.kara
+sn: Kara
+givenName: Burak
+cn: Burak Kara
+displayName: Burak Kara
+title: Student
+departmentNumber: Makine Muhendisligi
+uidNumber: 1005
+gidNumber: 1001
+userPassword: password123
+homeDirectory: /home/burak.kara
+mail: burak.kara@university.edu.tr
+
+dn: uid=zeynep.erdogan,ou=engineering,ou=users,dc=university,dc=edu,dc=tr
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: zeynep.erdogan
+sn: Erdogan
+givenName: Zeynep
+cn: Zeynep Erdogan
+displayName: Zeynep Erdogan
+title: Staff
+departmentNumber: Makine Muhendisligi
+uidNumber: 1006
+gidNumber: 1001
+userPassword: password123
+homeDirectory: /home/zeynep.erdogan
+mail: zeynep.erdogan@university.edu.tr
+
+dn: uid=emre.sahin,ou=engineering,ou=users,dc=university,dc=edu,dc=tr
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: emre.sahin
+sn: Sahin
+givenName: Emre
+cn: Emre Sahin
+displayName: Emre Sahin
+title: Student
+departmentNumber: Insaat Muhendisligi
+uidNumber: 1007
+gidNumber: 1001
+userPassword: password123
+homeDirectory: /home/emre.sahin
+mail: emre.sahin@university.edu.tr
+
+dn: uid=deniz.aydin,ou=engineering,ou=users,dc=university,dc=edu,dc=tr
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: deniz.aydin
+sn: Aydin
+givenName: Deniz
+cn: Deniz Aydin
+displayName: Deniz Aydin
+title: Staff
+departmentNumber: Insaat Muhendisligi
+uidNumber: 1008
+gidNumber: 1001
+userPassword: password123
+homeDirectory: /home/deniz.aydin
+mail: deniz.aydin@university.edu.tr
+
+# ============================================
+# HUMANITIES FACULTY (8 users)
+# ============================================
+
+dn: uid=ayse.kaya,ou=humanities,ou=users,dc=university,dc=edu,dc=tr
 objectClass: inetOrgPerson
 objectClass: posixAccount
 objectClass: shadowAccount
@@ -51,13 +183,32 @@ sn: Kaya
 givenName: Ayse
 cn: Ayse Kaya
 displayName: Ayse Kaya
-uidNumber: 1003
-gidNumber: 1001
+title: Staff
+departmentNumber: Tarih
+uidNumber: 2001
+gidNumber: 2001
 userPassword: password123
 homeDirectory: /home/ayse.kaya
 mail: ayse.kaya@university.edu.tr
 
-dn: uid=fatma.ozturk,ou=users,dc=university,dc=edu,dc=tr
+dn: uid=mehmet.celik,ou=humanities,ou=users,dc=university,dc=edu,dc=tr
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: mehmet.celik
+sn: Celik
+givenName: Mehmet
+cn: Mehmet Celik
+displayName: Mehmet Celik
+title: Student
+departmentNumber: Tarih
+uidNumber: 2002
+gidNumber: 2001
+userPassword: password123
+homeDirectory: /home/mehmet.celik
+mail: mehmet.celik@university.edu.tr
+
+dn: uid=fatma.ozturk,ou=humanities,ou=users,dc=university,dc=edu,dc=tr
 objectClass: inetOrgPerson
 objectClass: posixAccount
 objectClass: shadowAccount
@@ -66,34 +217,242 @@ sn: Ozturk
 givenName: Fatma
 cn: Fatma Ozturk
 displayName: Fatma Ozturk
-uidNumber: 1004
-gidNumber: 1001
+title: Student
+departmentNumber: Edebiyat
+uidNumber: 2003
+gidNumber: 2001
 userPassword: password123
 homeDirectory: /home/fatma.ozturk
 mail: fatma.ozturk@university.edu.tr
 
-dn: uid=ali.celik,ou=users,dc=university,dc=edu,dc=tr
+dn: uid=ali.yildiz,ou=humanities,ou=users,dc=university,dc=edu,dc=tr
 objectClass: inetOrgPerson
 objectClass: posixAccount
 objectClass: shadowAccount
-uid: ali.celik
-sn: Celik
+uid: ali.yildiz
+sn: Yildiz
 givenName: Ali
-cn: Ali Celik
-displayName: Ali Celik
-uidNumber: 1005
-gidNumber: 1001
+cn: Ali Yildiz
+displayName: Ali Yildiz
+title: Staff
+departmentNumber: Edebiyat
+uidNumber: 2004
+gidNumber: 2001
 userPassword: password123
-homeDirectory: /home/ali.celik
-mail: ali.celik@university.edu.tr
+homeDirectory: /home/ali.yildiz
+mail: ali.yildiz@university.edu.tr
 
-# Groups
-dn: cn=users,ou=groups,dc=university,dc=edu,dc=tr
+dn: uid=merve.arslan,ou=humanities,ou=users,dc=university,dc=edu,dc=tr
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: merve.arslan
+sn: Arslan
+givenName: Merve
+cn: Merve Arslan
+displayName: Merve Arslan
+title: Student
+departmentNumber: Felsefe
+uidNumber: 2005
+gidNumber: 2001
+userPassword: password123
+homeDirectory: /home/merve.arslan
+mail: merve.arslan@university.edu.tr
+
+dn: uid=hakan.dogan,ou=humanities,ou=users,dc=university,dc=edu,dc=tr
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: hakan.dogan
+sn: Dogan
+givenName: Hakan
+cn: Hakan Dogan
+displayName: Hakan Dogan
+title: Staff
+departmentNumber: Felsefe
+uidNumber: 2006
+gidNumber: 2001
+userPassword: password123
+homeDirectory: /home/hakan.dogan
+mail: hakan.dogan@university.edu.tr
+
+dn: uid=neslihan.korkmaz,ou=humanities,ou=users,dc=university,dc=edu,dc=tr
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: neslihan.korkmaz
+sn: Korkmaz
+givenName: Neslihan
+cn: Neslihan Korkmaz
+displayName: Neslihan Korkmaz
+title: Student
+departmentNumber: Sosyoloji
+uidNumber: 2007
+gidNumber: 2001
+userPassword: password123
+homeDirectory: /home/neslihan.korkmaz
+mail: neslihan.korkmaz@university.edu.tr
+
+dn: uid=ozan.polat,ou=humanities,ou=users,dc=university,dc=edu,dc=tr
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: ozan.polat
+sn: Polat
+givenName: Ozan
+cn: Ozan Polat
+displayName: Ozan Polat
+title: Staff
+departmentNumber: Sosyoloji
+uidNumber: 2008
+gidNumber: 2001
+userPassword: password123
+homeDirectory: /home/ozan.polat
+mail: ozan.polat@university.edu.tr
+
+# ============================================
+# RECTORATE (6 users)
+# ============================================
+
+dn: uid=prof.rektor,ou=rectorate,ou=users,dc=university,dc=edu,dc=tr
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: prof.rektor
+sn: Rektor
+givenName: Prof
+cn: Prof Rektor
+displayName: Prof. Dr. Rektor
+title: Staff
+departmentNumber: Rektorluk
+uidNumber: 3001
+gidNumber: 3001
+userPassword: password123
+homeDirectory: /home/prof.rektor
+mail: rektor@university.edu.tr
+
+dn: uid=sevgi.gunes,ou=rectorate,ou=users,dc=university,dc=edu,dc=tr
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: sevgi.gunes
+sn: Gunes
+givenName: Sevgi
+cn: Sevgi Gunes
+displayName: Sevgi Gunes
+title: Staff
+departmentNumber: Ogrenci Isleri
+uidNumber: 3002
+gidNumber: 3001
+userPassword: password123
+homeDirectory: /home/sevgi.gunes
+mail: sevgi.gunes@university.edu.tr
+
+dn: uid=kemal.tas,ou=rectorate,ou=users,dc=university,dc=edu,dc=tr
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: kemal.tas
+sn: Tas
+givenName: Kemal
+cn: Kemal Tas
+displayName: Kemal Tas
+title: Staff
+departmentNumber: Bilgi Islem
+uidNumber: 3003
+gidNumber: 3001
+userPassword: password123
+homeDirectory: /home/kemal.tas
+mail: kemal.tas@university.edu.tr
+
+dn: uid=gulsen.yaman,ou=rectorate,ou=users,dc=university,dc=edu,dc=tr
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: gulsen.yaman
+sn: Yaman
+givenName: Gulsen
+cn: Gulsen Yaman
+displayName: Gulsen Yaman
+title: Staff
+departmentNumber: Personel Daire
+uidNumber: 3004
+gidNumber: 3001
+userPassword: password123
+homeDirectory: /home/gulsen.yaman
+mail: gulsen.yaman@university.edu.tr
+
+dn: uid=tuncay.kilic,ou=rectorate,ou=users,dc=university,dc=edu,dc=tr
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: tuncay.kilic
+sn: Kilic
+givenName: Tuncay
+cn: Tuncay Kilic
+displayName: Tuncay Kilic
+title: Staff
+departmentNumber: Mali Isler
+uidNumber: 3005
+gidNumber: 3001
+userPassword: password123
+homeDirectory: /home/tuncay.kilic
+mail: tuncay.kilic@university.edu.tr
+
+dn: uid=ipek.cinar,ou=rectorate,ou=users,dc=university,dc=edu,dc=tr
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: ipek.cinar
+sn: Cinar
+givenName: Ipek
+cn: Ipek Cinar
+displayName: Ipek Cinar
+title: Student
+departmentNumber: Ogrenci Isleri
+uidNumber: 3006
+gidNumber: 3001
+userPassword: password123
+homeDirectory: /home/ipek.cinar
+mail: ipek.cinar@university.edu.tr
+
+# ============================================
+# GROUPS
+# ============================================
+
+dn: cn=engineering,ou=groups,dc=university,dc=edu,dc=tr
 objectClass: posixGroup
-cn: users
+cn: engineering
 gidNumber: 1001
 memberUid: ahmet.yilmaz
-memberUid: mehmet.demir
+memberUid: elif.demir
+memberUid: can.ozkan
+memberUid: selin.aksoy
+memberUid: burak.kara
+memberUid: zeynep.erdogan
+memberUid: emre.sahin
+memberUid: deniz.aydin
+
+dn: cn=humanities,ou=groups,dc=university,dc=edu,dc=tr
+objectClass: posixGroup
+cn: humanities
+gidNumber: 2001
 memberUid: ayse.kaya
+memberUid: mehmet.celik
 memberUid: fatma.ozturk
-memberUid: ali.celik
+memberUid: ali.yildiz
+memberUid: merve.arslan
+memberUid: hakan.dogan
+memberUid: neslihan.korkmaz
+memberUid: ozan.polat
+
+dn: cn=rectorate,ou=groups,dc=university,dc=edu,dc=tr
+objectClass: posixGroup
+cn: rectorate
+gidNumber: 3001
+memberUid: prof.rektor
+memberUid: sevgi.gunes
+memberUid: kemal.tas
+memberUid: gulsen.yaman
+memberUid: tuncay.kilic
+memberUid: ipek.cinar

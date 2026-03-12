@@ -62,6 +62,9 @@ export interface Recipient {
   email: string;
   firstName: string;
   lastName: string;
+  department: string;
+  faculty: string;
+  role: string;
   token: string;
   status: RecipientStatus;
   sentAt?: string;
@@ -114,14 +117,30 @@ export interface DashboardStats {
   overallSubmitRate: number;
 }
 
-// LDAP Types
+// LDAP Types — matches backend LdapUser serialization
 export interface LdapUser {
   dn: string;
-  cn: string;
-  sn: string;
-  mail: string;
-  uid?: string;
-  givenName?: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  username: string;
+  fullName: string;
+  department: string;
+  title: string;
+  faculty: string;
+}
+
+export interface LdapFaculty {
+  name: string;
+  count: number;
+}
+
+export interface DepartmentStat {
+  faculty: string;
+  totalRecipients: number;
+  totalClicked: number;
+  totalSubmitted: number;
+  submissionRate: number;
 }
 
 export interface LdapSyncResult {

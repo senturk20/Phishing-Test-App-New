@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Card,
@@ -25,6 +25,10 @@ import {
   CartesianGrid,
   Tooltip as RTooltip,
   ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
 } from 'recharts';
 import {
   Send,
@@ -38,7 +42,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { api } from '../api';
-import type { Campaign, DashboardStats } from '../types';
+import type { Campaign, DashboardStats, DepartmentStat } from '../types';
 import { campaignStatusMap } from '../utils/statusHelpers';
 import dayjs from 'dayjs';
 
@@ -52,19 +56,79 @@ const CHART_COLORS = {
   yellow: '#ffd43b',
 };
 
+const DEPT_PIE_COLORS = ['#1a80ff', '#e60000', '#ffd43b', '#00e673', '#b84dff', '#ff6b35'];
+
+const FACULTY_LABELS: Record<string, string> = {
+  engineering: 'Muhendislik',
+  humanities: 'Insan Bilimleri',
+  rectorate: 'Rektorluk',
+  'Ozel Gonderim': 'Ozel Gonderim',
+};
+
 export function Dashboard() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [deptStats, setDeptStats] = useState<DepartmentStat[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [campaignStats, setCampaignStats] = useState<Record<string, { sent: number; clicked: number; submitted: number }>>({});
 
+  // Fetch dashboard data
   useEffect(() => {
-    Promise.all([api.getCampaigns(), api.getDashboardStats()])
-      .then(([c, s]) => { setCampaigns(c); setStats(s); })
+    Promise.all([
+      api.getCampaigns(),
+      api.getDashboardStats(),
+      api.getDepartmentStats().catch(() => []),
+    ])
+      .then(([c, s, d]) => { setCampaigns(c); setStats(s); setDeptStats(d); })
       .catch(() => setError('Veriler yuklenemedi'))
       .finally(() => setLoading(false));
   }, []);
 
+  // Fetch per-campaign stats for bar chart
+  useEffect(() => {
+    const top = campaigns.slice(0, 6);
+    if (top.length === 0) return;
+    Promise.all(top.map(c => api.getCampaign(c.id).catch(() => null))).then(details => {
+      const map: Record<string, { sent: number; clicked: number; submitted: number }> = {};
+      details.forEach(d => {
+        if (d) map[d.id] = { sent: d.stats.emailsSent, clicked: d.stats.clicked, submitted: d.stats.submitted };
+      });
+      setCampaignStats(map);
+    });
+  }, [campaigns]);
+
+  // Derived data — always computed, never conditionally
+  const s = stats;
+  const clickRate = s?.overallClickRate ?? 0;
+  const submitRate = s?.overallSubmitRate ?? 0;
+
+  const barData = useMemo(() => campaigns.slice(0, 6).map(c => {
+    const cs = campaignStats[c.id];
+    return {
+      name: c.name.length > 15 ? c.name.substring(0, 15) + '...' : c.name,
+      hedef: c.targetCount || 0,
+      gonderilen: cs?.sent ?? 0,
+      tiklama: cs?.clicked ?? 0,
+      gonderim: cs?.submitted ?? 0,
+    };
+  }), [campaigns, campaignStats]);
+
+  const statusCounts = useMemo(() => ({
+    draft: campaigns.filter(c => c.status === 'draft').length,
+    active: campaigns.filter(c => c.status === 'active').length,
+    completed: campaigns.filter(c => c.status === 'completed').length,
+    paused: campaigns.filter(c => c.status === 'paused').length,
+  }), [campaigns]);
+
+  const pieData = useMemo(() => [
+    { name: 'Taslak', value: statusCounts.draft, color: '#909296' },
+    { name: 'Aktif', value: statusCounts.active, color: CHART_COLORS.blue },
+    { name: 'Tamamlandi', value: statusCounts.completed, color: CHART_COLORS.green },
+    { name: 'Duraklatildi', value: statusCounts.paused, color: CHART_COLORS.yellow },
+  ].filter(d => d.value > 0), [statusCounts]);
+
+  // ── Loading state ──
   if (loading) {
     return (
       <Center h={400}>
@@ -72,28 +136,6 @@ export function Dashboard() {
       </Center>
     );
   }
-
-  const s = stats;
-  const clickRate = s?.overallClickRate ?? 0;
-  const submitRate = s?.overallSubmitRate ?? 0;
-
-  const barData = campaigns.slice(0, 6).map(c => ({
-    name: c.name.length > 15 ? c.name.substring(0, 15) + '...' : c.name,
-    hedef: c.targetCount,
-  }));
-
-  const statusCounts = {
-    draft: campaigns.filter(c => c.status === 'draft').length,
-    active: campaigns.filter(c => c.status === 'active').length,
-    completed: campaigns.filter(c => c.status === 'completed').length,
-    paused: campaigns.filter(c => c.status === 'paused').length,
-  };
-  const pieData = [
-    { name: 'Taslak', value: statusCounts.draft, color: '#909296' },
-    { name: 'Aktif', value: statusCounts.active, color: CHART_COLORS.blue },
-    { name: 'Tamamlandi', value: statusCounts.completed, color: CHART_COLORS.green },
-    { name: 'Duraklatildi', value: statusCounts.paused, color: CHART_COLORS.yellow },
-  ].filter(d => d.value > 0);
 
   return (
     <Stack gap="lg">
@@ -183,7 +225,7 @@ export function Dashboard() {
               <BarChart data={barData}>
                 <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.border} />
                 <XAxis dataKey="name" tick={{ fill: CHART_COLORS.text, fontSize: 11 }} />
-                <YAxis tick={{ fill: CHART_COLORS.text, fontSize: 11 }} />
+                <YAxis tick={{ fill: CHART_COLORS.text, fontSize: 11 }} allowDecimals={false} />
                 <RTooltip
                   contentStyle={{
                     backgroundColor: CHART_COLORS.bg,
@@ -192,7 +234,11 @@ export function Dashboard() {
                     color: '#fff',
                   }}
                 />
-                <Bar dataKey="hedef" fill={CHART_COLORS.blue} radius={[4, 4, 0, 0]} />
+                <Legend wrapperStyle={{ color: CHART_COLORS.text, fontSize: 11 }} />
+                <Bar dataKey="hedef" name="Hedef" fill={CHART_COLORS.blue} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="gonderilen" name="Gonderilen" fill={CHART_COLORS.green} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="tiklama" name="Tiklama" fill={CHART_COLORS.yellow} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="gonderim" name="Form Gonderim" fill={CHART_COLORS.red} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -234,6 +280,93 @@ export function Dashboard() {
           )}
         </Card>
       </SimpleGrid>
+
+      {/* Department Vulnerability Analysis */}
+      <Card>
+        <Text fw={600} c="white" mb="md">Fakulte Bazli Zafiyet Analizi</Text>
+        <Text size="xs" c="dimmed" mb="md">
+          Gonderim Orani = (Form Gonderim / Tiklama) x 100
+        </Text>
+        {deptStats.length === 0 ? (
+          <Center h={250}><Text c="dimmed">Henuz fakulte verisi yok</Text></Center>
+        ) : (
+          <SimpleGrid cols={{ base: 1, md: 2 }}>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={deptStats.map(d => ({
+                    name: FACULTY_LABELS[d.faculty] || d.faculty,
+                    value: d.totalRecipients,
+                    submissionRate: d.submissionRate,
+                    totalClicked: d.totalClicked,
+                    totalSubmitted: d.totalSubmitted,
+                  }))}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={110}
+                  paddingAngle={3}
+                  dataKey="value"
+                  stroke="none"
+                >
+                  {deptStats.map((_, i) => (
+                    <Cell key={i} fill={DEPT_PIE_COLORS[i % DEPT_PIE_COLORS.length]} />
+                  ))}
+                </Pie>
+                <RTooltip
+                  contentStyle={{
+                    backgroundColor: CHART_COLORS.bg,
+                    border: `1px solid ${CHART_COLORS.border}`,
+                    borderRadius: 8,
+                    color: '#fff',
+                    fontSize: 12,
+                  }}
+                  formatter={(_value: number, _name: string, props: { payload: { submissionRate: number; totalClicked: number; totalSubmitted: number; value: number } }) => {
+                    const p = props.payload;
+                    const rate = typeof p.submissionRate === 'number' ? p.submissionRate.toFixed(1) : '0.0';
+                    return [
+                      `${p.value} alici — ${rate}% gonderim (${p.totalSubmitted ?? 0}/${p.totalClicked ?? 0} tiklayandan)`,
+                      'Fakulte',
+                    ];
+                  }}
+                />
+                <Legend
+                  wrapperStyle={{ color: CHART_COLORS.text, fontSize: 12 }}
+                  iconType="circle"
+                />
+              </PieChart>
+            </ResponsiveContainer>
+
+            <Stack gap="md" justify="center">
+              {deptStats.map((d, i) => {
+                const label = FACULTY_LABELS[d.faculty] || d.faculty;
+                const rate = typeof d.submissionRate === 'number' ? d.submissionRate : 0;
+                const riskColor = rate > 50 ? CHART_COLORS.red : rate > 25 ? CHART_COLORS.yellow : CHART_COLORS.green;
+                return (
+                  <Paper key={d.faculty} p="sm" radius="md" style={{ backgroundColor: '#1A1B1E', border: `1px solid ${CHART_COLORS.border}` }}>
+                    <Group justify="space-between" mb={6}>
+                      <Group gap="xs">
+                        <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: DEPT_PIE_COLORS[i % DEPT_PIE_COLORS.length] }} />
+                        <Text size="sm" fw={500} c="white">{label}</Text>
+                      </Group>
+                      <Text size="sm" fw={700} style={{ color: riskColor }}>
+                        {rate.toFixed(1)}%
+                      </Text>
+                    </Group>
+                    <Paper h={6} radius="xl" bg="dark.5">
+                      <Paper h={6} radius="xl" bg={riskColor} w={`${Math.min(rate, 100)}%`} />
+                    </Paper>
+                    <Group justify="space-between" mt={4}>
+                      <Text size="xs" c="dimmed">{d.totalRecipients} alici</Text>
+                      <Text size="xs" c="dimmed">{d.totalClicked} tiklama / {d.totalSubmitted} gonderim</Text>
+                    </Group>
+                  </Paper>
+                );
+              })}
+            </Stack>
+          </SimpleGrid>
+        )}
+      </Card>
 
       {/* Quick Actions + Risk */}
       <SimpleGrid cols={{ base: 1, md: 2 }}>

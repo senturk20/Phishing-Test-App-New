@@ -91,6 +91,9 @@ export interface Recipient {
   email: string;
   firstName: string;
   lastName: string;
+  department: string;
+  faculty: string;
+  role: string;
   token: string;
   status: RecipientStatus;
   sentAt?: Date;
@@ -160,4 +163,12 @@ export interface DashboardStats {
   totalSubmissions: number;
   overallClickRate: number;
   overallSubmitRate: number;
+}
+
+export interface DepartmentStat {
+  faculty: string;
+  totalRecipients: number;
+  totalClicked: number;
+  totalSubmitted: number;
+  submissionRate: number;  // (submitted / clicked) * 100
 }

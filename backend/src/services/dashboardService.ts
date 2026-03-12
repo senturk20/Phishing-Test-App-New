@@ -1,6 +1,6 @@
 import { config } from '../config.js';
 import { getPool, memoryStore } from '../db/index.js';
-import type { DashboardStats } from '../types/index.js';
+import type { DashboardStats, DepartmentStat } from '../types/index.js';
 
 // ============================================
 // GET DASHBOARD STATS
@@ -57,16 +57,16 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     p.query(`
       SELECT
         COUNT(*) as total,
-        COUNT(*) FILTER (WHERE status = 'active') as active,
-        COUNT(*) FILTER (WHERE status = 'completed') as completed,
-        COUNT(*) FILTER (WHERE status = 'draft') as draft,
-        COUNT(*) FILTER (WHERE status = 'paused') as paused
+        SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
+        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+        SUM(CASE WHEN status = 'draft' THEN 1 ELSE 0 END) as draft,
+        SUM(CASE WHEN status = 'paused' THEN 1 ELSE 0 END) as paused
       FROM campaigns
     `),
     p.query(`
       SELECT
         COUNT(*) as total,
-        COUNT(*) FILTER (WHERE status != 'pending') as sent
+        SUM(CASE WHEN status != 'pending' THEN 1 ELSE 0 END) as sent
       FROM recipients
     `),
     p.query(`SELECT COUNT(DISTINCT recipient_token) as count FROM events WHERE type = 'clicked'`),
@@ -92,4 +92,66 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     overallClickRate: totalEmailsSent > 0 ? (totalClicks / totalEmailsSent) * 100 : 0,
     overallSubmitRate: totalEmailsSent > 0 ? (totalSubmissions / totalEmailsSent) * 100 : 0,
   };
+}
+
+// ============================================
+// GET DEPARTMENT STATS (Vulnerability by Faculty)
+// ============================================
+// Formula: Submission Rate = (Total Submitted / Total Clicked) × 100
+
+export async function getDepartmentStats(): Promise<DepartmentStat[]> {
+  if (config.useMemoryDb) {
+    const recipients = memoryStore.recipients;
+    const events = memoryStore.events;
+
+    const clickedTokens = new Set(events.filter(e => e.type === 'clicked').map(e => e.recipientToken));
+    const submittedTokens = new Set(events.filter(e => e.type === 'submitted').map(e => e.recipientToken));
+
+    const facultyMap = new Map<string, { total: number; clicked: number; submitted: number }>();
+
+    for (const r of recipients) {
+      const fac = r.faculty || 'Ozel Gonderim';
+      if (!facultyMap.has(fac)) facultyMap.set(fac, { total: 0, clicked: 0, submitted: 0 });
+      const entry = facultyMap.get(fac)!;
+      entry.total++;
+      if (clickedTokens.has(r.token)) entry.clicked++;
+      if (submittedTokens.has(r.token)) entry.submitted++;
+    }
+
+    return Array.from(facultyMap.entries()).map(([faculty, data]) => ({
+      faculty,
+      totalRecipients: data.total,
+      totalClicked: data.clicked,
+      totalSubmitted: data.submitted,
+      submissionRate: data.clicked > 0 ? (data.submitted / data.clicked) * 100 : 0,
+    }));
+  }
+
+  const p = await getPool();
+  if (!p) return [];
+
+  const result = await p.query(`
+    SELECT
+      COALESCE(NULLIF(r.faculty, ''), 'Ozel Gonderim') AS faculty,
+      COUNT(DISTINCT r.id) AS total_recipients,
+      COUNT(DISTINCT CASE WHEN e_click.recipient_token IS NOT NULL THEN r.token END) AS total_clicked,
+      COUNT(DISTINCT CASE WHEN e_submit.recipient_token IS NOT NULL THEN r.token END) AS total_submitted
+    FROM recipients r
+    LEFT JOIN events e_click ON e_click.recipient_token = r.token AND e_click.type = 'clicked'
+    LEFT JOIN events e_submit ON e_submit.recipient_token = r.token AND e_submit.type = 'submitted'
+    GROUP BY COALESCE(NULLIF(r.faculty, ''), 'Ozel Gonderim')
+    ORDER BY total_recipients DESC
+  `);
+
+  return result.rows.map((row: { faculty: string; total_recipients: string; total_clicked: string; total_submitted: string }) => {
+    const clicked = parseInt(row.total_clicked, 10);
+    const submitted = parseInt(row.total_submitted, 10);
+    return {
+      faculty: row.faculty,
+      totalRecipients: parseInt(row.total_recipients, 10),
+      totalClicked: clicked,
+      totalSubmitted: submitted,
+      submissionRate: clicked > 0 ? (submitted / clicked) * 100 : 0,
+    };
+  });
 }
