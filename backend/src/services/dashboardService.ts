@@ -22,6 +22,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     const totalOpened = openedTokens.size;
     const totalClicks = clickedTokens.size;
     const totalSubmissions = submittedTokens.size;
+    const fileDownloadTokens = new Set(events.filter((e) => e.type === 'file_downloaded').map((e) => e.recipientToken));
+    const totalFileDownloads = fileDownloadTokens.size;
 
     return {
       totalCampaigns: campaigns.length,
@@ -37,6 +39,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       overallOpenRate: totalEmailsSent > 0 ? (totalOpened / totalEmailsSent) * 100 : 0,
       overallClickRate: totalEmailsSent > 0 ? (totalClicks / totalEmailsSent) * 100 : 0,
       overallSubmitRate: totalEmailsSent > 0 ? (totalSubmissions / totalEmailsSent) * 100 : 0,
+      totalFileDownloads,
+      overallFileDownloadRate: totalEmailsSent > 0 ? (totalFileDownloads / totalEmailsSent) * 100 : 0,
     };
   }
 
@@ -56,10 +60,12 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       overallOpenRate: 0,
       overallClickRate: 0,
       overallSubmitRate: 0,
+      totalFileDownloads: 0,
+      overallFileDownloadRate: 0,
     };
   }
 
-  const [campaignStats, recipientStats, openStats, clickStats, submitStats] = await Promise.all([
+  const [campaignStats, recipientStats, openStats, clickStats, submitStats, fileDownloadStats] = await Promise.all([
     p.query(`
       SELECT
         COUNT(*) as total,
@@ -78,6 +84,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     p.query(`SELECT COUNT(DISTINCT recipient_token) as count FROM events WHERE type = 'opened'`),
     p.query(`SELECT COUNT(DISTINCT recipient_token) as count FROM events WHERE type = 'clicked'`),
     p.query(`SELECT COUNT(DISTINCT recipient_token) as count FROM events WHERE type = 'submitted'`),
+    p.query(`SELECT COUNT(DISTINCT recipient_token) as count FROM events WHERE type = 'file_downloaded'`),
   ]);
 
   const c = campaignStats.rows[0];
@@ -86,6 +93,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   const totalOpened = parseInt(openStats.rows[0].count, 10);
   const totalClicks = parseInt(clickStats.rows[0].count, 10);
   const totalSubmissions = parseInt(submitStats.rows[0].count, 10);
+  const totalFileDownloads = parseInt(fileDownloadStats.rows[0].count, 10);
 
   return {
     totalCampaigns: parseInt(c.total, 10),
@@ -101,6 +109,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     overallOpenRate: totalEmailsSent > 0 ? (totalOpened / totalEmailsSent) * 100 : 0,
     overallClickRate: totalEmailsSent > 0 ? (totalClicks / totalEmailsSent) * 100 : 0,
     overallSubmitRate: totalEmailsSent > 0 ? (totalSubmissions / totalEmailsSent) * 100 : 0,
+    totalFileDownloads,
+    overallFileDownloadRate: totalEmailsSent > 0 ? (totalFileDownloads / totalEmailsSent) * 100 : 0,
   };
 }
 

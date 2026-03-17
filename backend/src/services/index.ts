@@ -91,3 +91,11 @@ export type { LdapUser, SyncResult } from './ldapService.js';
 // Dashboard Department Stats
 export { getDepartmentStats } from './dashboardService.js';
 export type { DepartmentStat } from '../types/index.js';
+
+// Attachment Service
+export {
+  getAttachments,
+  getAttachment,
+  createAttachment,
+  deleteAttachment,
+} from './attachmentService.js';

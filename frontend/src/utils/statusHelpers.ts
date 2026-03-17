@@ -16,7 +16,8 @@ export const recipientStatusMap: Record<RecipientStatus, { label: string; color:
 };
 
 export const eventTypeMap: Record<EventType, { label: string; color: string }> = {
-  opened:    { label: 'Acildi',     color: 'cyan' },
-  clicked:   { label: 'Tiklandi',   color: 'yellow' },
-  submitted: { label: 'Gonderildi', color: 'alertRed' },
+  opened:          { label: 'Acildi',          color: 'cyan' },
+  clicked:         { label: 'Tiklandi',        color: 'yellow' },
+  submitted:       { label: 'Gonderildi',      color: 'alertRed' },
+  file_downloaded: { label: 'Dosya Indirildi', color: 'orange' },
 };

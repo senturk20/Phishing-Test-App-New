@@ -41,6 +41,7 @@ import {
   AlertTriangle,
   Mail,
   FileText,
+  Download,
 } from 'lucide-react';
 import { api } from '../api';
 import type { Campaign, DashboardStats, DepartmentStat } from '../types';
@@ -56,6 +57,7 @@ const CHART_COLORS = {
   green: '#00e673',
   red: '#e60000',
   yellow: '#ffd43b',
+  orange: '#ff6b35',
 };
 
 const DEPT_PIE_COLORS = ['#1a80ff', '#e60000', '#ffd43b', '#00e673', '#b84dff', '#ff6b35'];
@@ -73,7 +75,7 @@ export function Dashboard() {
   const [deptStats, setDeptStats] = useState<DepartmentStat[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [campaignStats, setCampaignStats] = useState<Record<string, { sent: number; opened: number; clicked: number; submitted: number }>>({});
+  const [campaignStats, setCampaignStats] = useState<Record<string, { sent: number; opened: number; clicked: number; submitted: number; fileDownloaded: number }>>({});
 
   // Fetch dashboard data
   useEffect(() => {
@@ -92,9 +94,9 @@ export function Dashboard() {
     const top = campaigns.slice(0, 6);
     if (top.length === 0) return;
     Promise.all(top.map(c => api.getCampaign(c.id).catch(() => null))).then(details => {
-      const map: Record<string, { sent: number; opened: number; clicked: number; submitted: number }> = {};
+      const map: Record<string, { sent: number; opened: number; clicked: number; submitted: number; fileDownloaded: number }> = {};
       details.forEach(d => {
-        if (d) map[d.id] = { sent: d.stats.emailsSent, opened: d.stats.opened ?? 0, clicked: d.stats.clicked, submitted: d.stats.submitted };
+        if (d) map[d.id] = { sent: d.stats.emailsSent, opened: d.stats.opened ?? 0, clicked: d.stats.clicked, submitted: d.stats.submitted, fileDownloaded: d.stats.fileDownloaded ?? 0 };
       });
       setCampaignStats(map);
     });
@@ -105,6 +107,7 @@ export function Dashboard() {
   const openRate = s?.overallOpenRate ?? 0;
   const clickRate = s?.overallClickRate ?? 0;
   const submitRate = s?.overallSubmitRate ?? 0;
+  const fileDownloadRate = s?.overallFileDownloadRate ?? 0;
 
   const barData = useMemo(() => campaigns.slice(0, 6).map(c => {
     const cs = campaignStats[c.id];
@@ -115,6 +118,7 @@ export function Dashboard() {
       acilma: cs?.opened ?? 0,
       tiklama: cs?.clicked ?? 0,
       gonderim: cs?.submitted ?? 0,
+      dosyaIndirme: cs?.fileDownloaded ?? 0,
     };
   }), [campaigns, campaignStats]);
 
@@ -165,7 +169,7 @@ export function Dashboard() {
       )}
 
       {/* Metric Cards */}
-      <SimpleGrid cols={{ base: 1, xs: 2, md: 5 }}>
+      <SimpleGrid cols={{ base: 1, xs: 2, md: 6 }}>
         <Card>
           <Group justify="space-between" align="flex-start">
             <div>
@@ -220,6 +224,19 @@ export function Dashboard() {
         <Card>
           <Group justify="space-between" align="flex-start">
             <div>
+              <Text size="xs" tt="uppercase" fw={600} c="dimmed">Dosya Indirme</Text>
+              <Text size="xl" fw={700} c="white" mt={4}>{fileDownloadRate.toFixed(1)}%</Text>
+              <Text size="xs" c="dimmed">{s?.totalFileDownloads ?? 0} indirme</Text>
+            </div>
+            <ThemeIcon variant="light" color="orange" size="lg" radius="md">
+              <Download size={18} />
+            </ThemeIcon>
+          </Group>
+        </Card>
+
+        <Card>
+          <Group justify="space-between" align="flex-start">
+            <div>
               <Text size="xs" tt="uppercase" fw={600} c="dimmed">Toplam Alici</Text>
               <Text size="xl" fw={700} c="white" mt={4}>{s?.totalRecipients ?? 0}</Text>
               <Text size="xs" c="dimmed">{s?.totalCampaigns ?? 0} kampanya</Text>
@@ -257,6 +274,7 @@ export function Dashboard() {
                 <Bar dataKey="acilma" name="Acilma" fill={CHART_COLORS.cyan} radius={[4, 4, 0, 0]} />
                 <Bar dataKey="tiklama" name="Tiklama" fill={CHART_COLORS.yellow} radius={[4, 4, 0, 0]} />
                 <Bar dataKey="gonderim" name="Form Gonderim" fill={CHART_COLORS.red} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="dosyaIndirme" name="Dosya Indirme" fill={CHART_COLORS.orange} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -436,6 +454,15 @@ export function Dashboard() {
               </Group>
               <Paper h={8} radius="xl" bg="dark.5">
                 <Paper h={8} radius="xl" bg={submitRate > 20 ? 'alertRed' : submitRate > 5 ? 'yellow' : 'cyberGreen'} w={`${Math.min(submitRate, 100)}%`} />
+              </Paper>
+            </div>
+            <div>
+              <Group justify="space-between" mb={4}>
+                <Text size="sm" c="dimmed">Dosya Indirme Orani</Text>
+                <Text size="sm" fw={600} c="orange">{fileDownloadRate.toFixed(1)}%</Text>
+              </Group>
+              <Paper h={8} radius="xl" bg="dark.5">
+                <Paper h={8} radius="xl" bg="orange" w={`${Math.min(fileDownloadRate, 100)}%`} />
               </Paper>
             </div>
           </Stack>

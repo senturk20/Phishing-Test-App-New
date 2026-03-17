@@ -1,5 +1,5 @@
 export type CampaignStatus = 'draft' | 'active' | 'completed' | 'paused';
-export type EventType = 'opened' | 'clicked' | 'submitted';
+export type EventType = 'opened' | 'clicked' | 'submitted' | 'file_downloaded';
 export type RecipientStatus = 'pending' | 'sent' | 'clicked' | 'submitted' | 'failed';
 export type Frequency = 'once' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly';
 export type SendingMode = 'all' | 'spread';
@@ -26,6 +26,7 @@ export interface Campaign {
   templateId?: string;
   phishDomain?: string;
   landingPageId?: string;
+  attachmentId?: string;
   addClickersToGroup?: string;
   sendReportEmail?: boolean;
   createdAt: string;
@@ -51,6 +52,8 @@ export interface CampaignStats {
   openRate: number;
   clickRate: number;
   submitRate: number;
+  fileDownloaded: number;
+  fileDownloadRate: number;
 }
 
 export interface CampaignDetail extends Campaign {
@@ -119,6 +122,17 @@ export interface DashboardStats {
   overallOpenRate: number;
   overallClickRate: number;
   overallSubmitRate: number;
+  totalFileDownloads: number;
+  overallFileDownloadRate: number;
+}
+
+export interface Attachment {
+  id: string;
+  originalName: string;
+  storedName: string;
+  mimeType: string;
+  size: number;
+  createdAt: string;
 }
 
 // LDAP Types — matches backend LdapUser serialization
@@ -181,6 +195,7 @@ export interface CampaignFormData {
   templateId?: string;
   phishDomain: string;
   landingPageId?: string;
+  attachmentId?: string;
   addClickersToGroup?: string;
   sendReportEmail: boolean;
 }

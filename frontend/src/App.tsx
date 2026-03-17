@@ -9,6 +9,7 @@ import { CampaignNew } from './pages/CampaignNew';
 import { LandingPages } from './pages/LandingPages';
 import { LandingPage } from './pages/LandingPage';
 import { EmailTemplates } from './pages/EmailTemplates';
+import { FileManager } from './pages/FileManager';
 import { Center, Loader } from '@mantine/core';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -65,6 +66,7 @@ function AppRoutes() {
         <Route path="campaigns/:id" element={<CampaignDetail />} />
         <Route path="landing-pages" element={<LandingPages />} />
         <Route path="email-templates" element={<EmailTemplates />} />
+        <Route path="file-manager" element={<FileManager />} />
       </Route>
 
       {/* Phishing Landing Page (Layout disinda, public) */}

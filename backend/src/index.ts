@@ -22,6 +22,8 @@ import {
   clonerRoutes,
   phishingRoutes,
   pixelRoutes,
+  attachmentRoutes,
+  downloadRoutes,
 } from './routes/index.js';
 import {
   closeLdapConnection,
@@ -180,6 +182,7 @@ const limiter = rateLimit({
       || p.startsWith('/static/')
       || p.startsWith('/t/')
       || p.startsWith('/p/')
+      || p.startsWith('/download/')
       || p.startsWith('/events')
       || p.startsWith('/api/events');
   },
@@ -220,6 +223,7 @@ app.get('/health', async (_req: Request, res: Response) => {
 
 app.use('/auth', authRoutes);
 app.use('/p', phishingRoutes);
+app.use('/download', downloadRoutes);
 app.use('/events', eventRoutes);      // Direct calls (api.ts, LandingPage.tsx)
 app.use('/api/events', eventRoutes);  // DB-seeded landing pages use /api/events (legacy nginx convention)
 
@@ -236,6 +240,7 @@ app.use('/dashboard', verifyToken, dashboardRoutes);
 app.use('/ldap', verifyToken, ldapRoutes);
 app.use('/queue', verifyToken, queueRoutes);
 app.use('/clone', verifyToken, clonerRoutes);
+app.use('/attachments', verifyToken, attachmentRoutes);
 
 // ============================================
 // ERROR HANDLER
@@ -286,9 +291,22 @@ async function startServer() {
         await pool.query(`ALTER TABLE recipients ADD COLUMN IF NOT EXISTS department VARCHAR(255) DEFAULT '';`);
         await pool.query(`ALTER TABLE recipients ADD COLUMN IF NOT EXISTS faculty VARCHAR(255) DEFAULT '';`);
         await pool.query(`ALTER TABLE recipients ADD COLUMN IF NOT EXISTS role VARCHAR(100) DEFAULT '';`);
-        // Add 'opened' to events type check constraint (for email open tracking)
+        // Attachments table
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS attachments (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            original_name VARCHAR(500) NOT NULL,
+            stored_name VARCHAR(500) NOT NULL,
+            mime_type VARCHAR(255) DEFAULT 'application/octet-stream',
+            size INTEGER DEFAULT 0,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          );
+        `);
+        // Add attachment_id to campaigns
+        await pool.query(`ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS attachment_id UUID REFERENCES attachments(id) ON DELETE SET NULL;`);
+        // Add 'file_downloaded' + 'opened' to events type check constraint
         await pool.query(`ALTER TABLE events DROP CONSTRAINT IF EXISTS events_type_check;`);
-        await pool.query(`ALTER TABLE events ADD CONSTRAINT events_type_check CHECK (type IN ('opened', 'clicked', 'submitted'));`);
+        await pool.query(`ALTER TABLE events ADD CONSTRAINT events_type_check CHECK (type IN ('opened', 'clicked', 'submitted', 'file_downloaded'));`);
         console.log('[Migration] Schema migrations applied successfully');
       }
     } catch (err) {

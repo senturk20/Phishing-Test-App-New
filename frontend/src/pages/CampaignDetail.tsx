@@ -35,6 +35,7 @@ import {
   MailOpen,
   MousePointerClick,
   FileWarning,
+  Download,
   RefreshCw,
   AlertTriangle,
   Search,
@@ -355,7 +356,7 @@ export function CampaignDetail() {
       </Group>
 
       {/* Stats Grid */}
-      <SimpleGrid cols={{ base: 1, xs: 2, md: 5 }}>
+      <SimpleGrid cols={{ base: 1, xs: 2, md: 6 }}>
         <Card>
           <Group justify="space-between" align="flex-start">
             <div>
@@ -402,6 +403,16 @@ export function CampaignDetail() {
               <Text size="xs" c="dimmed">{stats.submitRate.toFixed(1)}%</Text>
             </div>
             <ThemeIcon variant="light" color="alertRed" size="lg" radius="md"><FileWarning size={18} /></ThemeIcon>
+          </Group>
+        </Card>
+        <Card>
+          <Group justify="space-between" align="flex-start">
+            <div>
+              <Text size="xs" tt="uppercase" fw={600} c="dimmed">Dosya Indirme</Text>
+              <Text size="xl" fw={700} c="white" mt={4}>{stats.fileDownloaded ?? 0}</Text>
+              <Text size="xs" c="dimmed">{(stats.fileDownloadRate ?? 0).toFixed(1)}%</Text>
+            </div>
+            <ThemeIcon variant="light" color="orange" size="lg" radius="md"><Download size={18} /></ThemeIcon>
           </Group>
         </Card>
       </SimpleGrid>

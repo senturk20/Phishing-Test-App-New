@@ -25,7 +25,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { api } from '../api';
-import type { Frequency, SendingMode, EmailTemplate, LandingPage, LdapFaculty } from '../types';
+import type { Frequency, SendingMode, EmailTemplate, LandingPage, LdapFaculty, Attachment } from '../types';
 
 const CATEGORIES = [
   { value: 'it', label: 'IT' },
@@ -73,6 +73,7 @@ export function CampaignNew() {
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [landingPages, setLandingPages] = useState<LandingPage[]>([]);
   const [faculties, setFaculties] = useState<LdapFaculty[]>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
 
   const [form, setForm] = useState({
     name: '',
@@ -93,6 +94,7 @@ export function CampaignNew() {
     templateId: '',
     phishDomain: 'random',
     landingPageId: '',
+    attachmentId: '',
     addClickersToGroup: '',
     sendReportEmail: true,
   });
@@ -104,14 +106,16 @@ export function CampaignNew() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [templatesData, landingPagesData, facultiesData] = await Promise.all([
+        const [templatesData, landingPagesData, facultiesData, attachmentsData] = await Promise.all([
           api.getTemplates(),
           api.getLandingPages(),
           api.getLdapFaculties().catch(() => ({ faculties: [], total: 0 })),
+          api.getAttachments().catch(() => []),
         ]);
         setTemplates(templatesData);
         setLandingPages(landingPagesData);
         setFaculties(facultiesData.faculties);
+        setAttachments(attachmentsData);
 
         const landingPageId = searchParams.get('landingPageId');
         if (landingPageId) updateForm('landingPageId', landingPageId);
@@ -160,6 +164,7 @@ export function CampaignNew() {
         templateId: form.templateMode === 'specific' ? form.templateId : undefined,
         phishDomain: form.phishDomain,
         landingPageId: form.landingPageId || undefined,
+        attachmentId: form.attachmentId || undefined,
         addClickersToGroup: form.addClickersToGroup || undefined,
         sendReportEmail: form.sendReportEmail,
       });
@@ -438,6 +443,25 @@ export function CampaignNew() {
                   disabled={loading}
                 />
               </SimpleGrid>
+              <Select
+                label="Ek Dosya (Download Portal)"
+                description="Secilirse e-posta linki dosya indirme portalina yonlendirir"
+                data={[
+                  { value: '', label: '-- Dosya Ekleme --' },
+                  ...attachments.map(a => ({
+                    value: a.id,
+                    label: `${a.originalName} (${a.size > 1024 * 1024 ? (a.size / (1024 * 1024)).toFixed(1) + ' MB' : (a.size / 1024).toFixed(1) + ' KB'})`,
+                  })),
+                ]}
+                value={form.attachmentId}
+                onChange={v => updateForm('attachmentId', v || '')}
+                disabled={loading}
+              />
+              {form.attachmentId && (
+                <Text size="xs" c="yellow" fs="italic">
+                  Lütfen şablonunuzda {'{{downloadLink}}'} veya {'{{downloadButton}}'} etiketini kullandığınızdan emin olun.
+                </Text>
+              )}
               <Select
                 label="Tiklayanlari Gruba Ekle"
                 data={CLICKER_GROUPS}

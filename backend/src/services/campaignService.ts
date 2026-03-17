@@ -16,14 +16,23 @@ function replacePlaceholders(
   text: string,
   recipient: { firstName: string; lastName: string; email: string },
   trackingLink: string,
-  phishDomain: string
+  phishDomain: string,
+  downloadLink?: string
 ): string {
   const fullName = [recipient.firstName, recipient.lastName].filter(Boolean).join(' ');
+
+  // Build a styled download button for {{downloadLink}} placeholder
+  const downloadHtml = downloadLink
+    ? `<a href="${downloadLink}" style="display:inline-block;padding:12px 28px;background:#1e3a5f;color:#ffffff;text-decoration:none;border-radius:6px;font-family:'Segoe UI',Tahoma,sans-serif;font-size:15px;font-weight:600;border:1px solid #2d5a8e;letter-spacing:0.3px;" target="_blank">&#128196; Dosyayi Goruntule</a>`
+    : '';
+
   return text
     .replace(/\{\{firstName\}\}/g, recipient.firstName || '')
     .replace(/\{\{lastName\}\}/g, recipient.lastName || '')
     .replace(/\{\{name\}\}/g, fullName)
     .replace(/\{\{trackingLink\}\}/g, trackingLink)
+    .replace(/\{\{downloadLink\}\}/g, downloadLink || trackingLink)
+    .replace(/\{\{downloadButton\}\}/g, downloadHtml)
     .replace(/\{\{link\}\}/g, trackingLink)
     .replace(/\{\{email\}\}/g, recipient.email)
     .replace(/\{\{phish_domain\}\}/g, phishDomain)
@@ -88,6 +97,7 @@ export async function getCampaigns(): Promise<Campaign[]> {
     templateId: row.template_id,
     phishDomain: row.phish_domain,
     landingPageId: row.landing_page_id,
+    attachmentId: row.attachment_id,
     addClickersToGroup: row.add_clickers_to_group,
     sendReportEmail: row.send_report_email,
     nextRunAt: row.next_run_at,
@@ -139,6 +149,7 @@ export async function getCampaign(id: string): Promise<Campaign | null> {
     templateId: row.template_id,
     phishDomain: row.phish_domain,
     landingPageId: row.landing_page_id,
+    attachmentId: row.attachment_id,
     addClickersToGroup: row.add_clickers_to_group,
     sendReportEmail: row.send_report_email,
     nextRunAt: row.next_run_at,
@@ -172,6 +183,7 @@ export async function createCampaign(data: {
   templateId?: string;
   phishDomain?: string;
   landingPageId?: string;
+  attachmentId?: string;
   addClickersToGroup?: string;
   sendReportEmail?: boolean;
 }): Promise<Campaign> {
@@ -198,6 +210,7 @@ export async function createCampaign(data: {
     templateId: data.templateId,
     phishDomain: data.phishDomain || 'random',
     landingPageId: data.landingPageId,
+    attachmentId: data.attachmentId,
     addClickersToGroup: data.addClickersToGroup,
     sendReportEmail: data.sendReportEmail !== undefined ? data.sendReportEmail : true,
   };
@@ -224,6 +237,7 @@ export async function createCampaign(data: {
       templateId: campaignData.templateId,
       phishDomain: campaignData.phishDomain,
       landingPageId: campaignData.landingPageId,
+      attachmentId: campaignData.attachmentId,
       addClickersToGroup: campaignData.addClickersToGroup,
       sendReportEmail: campaignData.sendReportEmail,
       status: 'draft',
@@ -243,8 +257,8 @@ export async function createCampaign(data: {
       name, description, target_count, frequency, start_date, start_time, timezone,
       sending_mode, spread_days, spread_unit, business_hours_start, business_hours_end,
       business_days, track_activity_days, category, template_mode, template_id,
-      phish_domain, landing_page_id, add_clickers_to_group, send_report_email
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+      phish_domain, landing_page_id, attachment_id, add_clickers_to_group, send_report_email
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
     RETURNING *`,
     [
       campaignData.name,
@@ -266,6 +280,7 @@ export async function createCampaign(data: {
       campaignData.templateId || null,
       campaignData.phishDomain,
       campaignData.landingPageId || null,
+      campaignData.attachmentId || null,
       campaignData.addClickersToGroup || null,
       campaignData.sendReportEmail,
     ]
@@ -296,6 +311,7 @@ export async function createCampaign(data: {
     templateId: row.template_id,
     phishDomain: row.phish_domain,
     landingPageId: row.landing_page_id,
+    attachmentId: row.attachment_id,
     addClickersToGroup: row.add_clickers_to_group,
     sendReportEmail: row.send_report_email,
     nextRunAt: row.next_run_at,
@@ -385,6 +401,7 @@ export async function updateCampaign(
     templateId: row.template_id,
     phishDomain: row.phish_domain,
     landingPageId: row.landing_page_id,
+    attachmentId: row.attachment_id,
     addClickersToGroup: row.add_clickers_to_group,
     sendReportEmail: row.send_report_email,
     nextRunAt: row.next_run_at,
@@ -515,18 +532,20 @@ export async function startCampaign(id: string): Promise<Campaign | null> {
   // --- Dispatch emails to all recipients ---
   const recipients = await getRecipientsByCampaign(id);
   const phishDomain = campaign.phishDomain || 'secure-login.com';
+  const hasAttachment = !!campaign.attachmentId;
   const useQueue = await isRedisAvailable();
 
   if (useQueue) {
     // --- Queue mode: enqueue all jobs in a single batch ---
     const jobs: EmailJobData[] = recipients.map((recipient) => {
       const trackingLink = `${trackingBase}/t/${recipient.token}`;
+      const dlLink = hasAttachment ? `${trackingBase}/download/${recipient.token}` : undefined;
       return {
         recipientToken: recipient.token,
         recipientEmail: recipient.email,
-        subject: replacePlaceholders(templateSubject, recipient, trackingLink, phishDomain),
+        subject: replacePlaceholders(templateSubject, recipient, trackingLink, phishDomain, dlLink),
         html: injectTrackingPixel(
-          replacePlaceholders(templateBody, recipient, trackingLink, phishDomain),
+          replacePlaceholders(templateBody, recipient, trackingLink, phishDomain, dlLink),
           trackingBase, recipient.token
         ),
         campaignId: campaign.id,
@@ -559,11 +578,12 @@ export async function startCampaign(id: string): Promise<Campaign | null> {
         limit(async () => {
           try {
             const trackingLink = `${trackingBase}/t/${recipient.token}`;
+            const dlLink = hasAttachment ? `${trackingBase}/download/${recipient.token}` : undefined;
             const html = injectTrackingPixel(
-              replacePlaceholders(templateBody, recipient, trackingLink, phishDomain),
+              replacePlaceholders(templateBody, recipient, trackingLink, phishDomain, dlLink),
               trackingBase, recipient.token
             );
-            const subject = replacePlaceholders(templateSubject, recipient, trackingLink, phishDomain);
+            const subject = replacePlaceholders(templateSubject, recipient, trackingLink, phishDomain, dlLink);
 
             const success = await sendEmail({ to: recipient.email, subject, html });
             if (success) {
@@ -642,6 +662,7 @@ export async function pauseCampaign(id: string): Promise<Campaign | null> {
     templateId: row.template_id,
     phishDomain: row.phish_domain,
     landingPageId: row.landing_page_id,
+    attachmentId: row.attachment_id,
     addClickersToGroup: row.add_clickers_to_group,
     sendReportEmail: row.send_report_email,
     nextRunAt: row.next_run_at,
@@ -704,6 +725,7 @@ export async function resumeCampaign(id: string): Promise<Campaign | null> {
     templateId: row.template_id,
     phishDomain: row.phish_domain,
     landingPageId: row.landing_page_id,
+    attachmentId: row.attachment_id,
     addClickersToGroup: row.add_clickers_to_group,
     sendReportEmail: row.send_report_email,
     nextRunAt: row.next_run_at,
@@ -766,6 +788,7 @@ export async function completeCampaign(id: string): Promise<Campaign | null> {
     templateId: row.template_id,
     phishDomain: row.phish_domain,
     landingPageId: row.landing_page_id,
+    attachmentId: row.attachment_id,
     addClickersToGroup: row.add_clickers_to_group,
     sendReportEmail: row.send_report_email,
     nextRunAt: row.next_run_at,
@@ -793,6 +816,8 @@ export async function getCampaignStats(campaignId: string): Promise<CampaignStat
     const opened = openedTokens.size;
     const clicked = clickedTokens.size;
     const submitted = submittedTokens.size;
+    const fileDownloadedTokens = new Set(events.filter((e) => e.type === 'file_downloaded').map((e) => e.recipientToken));
+    const fileDownloaded = fileDownloadedTokens.size;
 
     return {
       totalTargets,
@@ -803,12 +828,14 @@ export async function getCampaignStats(campaignId: string): Promise<CampaignStat
       openRate: totalTargets > 0 ? (opened / totalTargets) * 100 : 0,
       clickRate: totalTargets > 0 ? (clicked / totalTargets) * 100 : 0,
       submitRate: totalTargets > 0 ? (submitted / totalTargets) * 100 : 0,
+      fileDownloaded,
+      fileDownloadRate: totalTargets > 0 ? (fileDownloaded / totalTargets) * 100 : 0,
     };
   }
 
   const p = await getPool();
   if (!p) {
-    return { totalTargets: 0, emailsSent: 0, opened: 0, clicked: 0, submitted: 0, openRate: 0, clickRate: 0, submitRate: 0 };
+    return { totalTargets: 0, emailsSent: 0, opened: 0, clicked: 0, submitted: 0, openRate: 0, clickRate: 0, submitRate: 0, fileDownloaded: 0, fileDownloadRate: 0 };
   }
 
   const recipientResult = await p.query(
@@ -839,9 +866,16 @@ export async function getCampaignStats(campaignId: string): Promise<CampaignStat
     [campaignId]
   );
 
+  const fileDownloadedResult = await p.query(
+    `SELECT COUNT(DISTINCT recipient_token) as count FROM events
+     WHERE campaign_id = $1 AND type = 'file_downloaded'`,
+    [campaignId]
+  );
+
   const opened = parseInt(openedResult.rows[0].count, 10);
   const clicked = parseInt(clickedResult.rows[0].count, 10);
   const submitted = parseInt(submittedResult.rows[0].count, 10);
+  const fileDownloaded = parseInt(fileDownloadedResult.rows[0].count, 10);
 
   return {
     totalTargets,
@@ -852,5 +886,7 @@ export async function getCampaignStats(campaignId: string): Promise<CampaignStat
     openRate: totalTargets > 0 ? (opened / totalTargets) * 100 : 0,
     clickRate: totalTargets > 0 ? (clicked / totalTargets) * 100 : 0,
     submitRate: totalTargets > 0 ? (submitted / totalTargets) * 100 : 0,
+    fileDownloaded,
+    fileDownloadRate: totalTargets > 0 ? (fileDownloaded / totalTargets) * 100 : 0,
   };
 }

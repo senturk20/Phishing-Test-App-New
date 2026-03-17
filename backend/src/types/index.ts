@@ -38,6 +38,7 @@ export interface Campaign {
   // Phishing configuration
   phishDomain: string;
   landingPageId?: string;
+  attachmentId?: string;
   addClickersToGroup?: string;
   sendReportEmail: boolean;
 
@@ -58,6 +59,8 @@ export interface CampaignStats {
   openRate: number;
   clickRate: number;
   submitRate: number;
+  fileDownloaded: number;
+  fileDownloadRate: number;
 }
 
 export interface CampaignDetail extends Campaign {
@@ -69,7 +72,7 @@ export interface CampaignDetail extends Campaign {
 // EVENT TYPES
 // ============================================
 
-export type EventType = 'opened' | 'clicked' | 'submitted';
+export type EventType = 'opened' | 'clicked' | 'submitted' | 'file_downloaded';
 
 export interface CampaignEvent {
   id: string;
@@ -167,6 +170,8 @@ export interface DashboardStats {
   overallOpenRate: number;
   overallClickRate: number;
   overallSubmitRate: number;
+  totalFileDownloads: number;
+  overallFileDownloadRate: number;
 }
 
 export interface DepartmentStat {

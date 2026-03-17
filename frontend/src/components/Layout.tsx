@@ -20,6 +20,7 @@ import {
   Shield,
   Database,
   Server,
+  Paperclip,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -34,6 +35,7 @@ const NAV_ITEMS = [
   { to: '/campaigns/new', icon: PlusCircle, label: 'Yeni Kampanya' },
   { to: '/landing-pages', icon: FileText, label: 'Landing Pages' },
   { to: '/email-templates', icon: Mail, label: 'E-posta Sablonlari' },
+  { to: '/file-manager', icon: Paperclip, label: 'Dosya Yonetimi' },
 ];
 
 const statusColor = (s: string) =>

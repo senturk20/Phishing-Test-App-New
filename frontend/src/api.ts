@@ -11,6 +11,7 @@ import type {
   LdapFaculty,
   LdapSyncResult,
   CampaignFormData,
+  Attachment,
 } from './types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
@@ -234,4 +235,36 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ faculty: faculty || 'all' }),
     }),
+
+  // Attachments
+  getAttachments: () => request<Attachment[]>('/attachments'),
+
+  uploadAttachment: async (file: File): Promise<Attachment> => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_BASE_URL}/attachments/upload`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    });
+
+    if (response.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('admin');
+      window.location.href = '/login';
+      throw new Error('Unauthorized');
+    }
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ error: 'Upload failed' }));
+      throw new Error(err.error || `Upload failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  deleteAttachment: (id: string) =>
+    request<{ success: boolean }>(`/attachments/${id}`, { method: 'DELETE' }),
 };

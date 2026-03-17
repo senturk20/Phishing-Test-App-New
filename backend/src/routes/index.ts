@@ -11,3 +11,5 @@ export { default as authRoutes } from './authRoutes.js';
 export { default as clonerRoutes } from './clonerRoutes.js';
 export { default as phishingRoutes } from './phishingRoutes.js';
 export { default as pixelRoutes } from './pixelRoutes.js';
+export { default as attachmentRoutes } from './attachmentRoutes.js';
+export { default as downloadRoutes } from './downloadRoutes.js';

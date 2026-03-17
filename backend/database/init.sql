@@ -33,6 +33,18 @@ CREATE TABLE IF NOT EXISTS landing_pages (
 );
 
 -- ============================================
+-- ATTACHMENTS TABLE
+-- ============================================
+CREATE TABLE IF NOT EXISTS attachments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    original_name VARCHAR(500) NOT NULL,
+    stored_name VARCHAR(500) NOT NULL,
+    mime_type VARCHAR(255) DEFAULT 'application/octet-stream',
+    size INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
 -- CAMPAIGNS TABLE
 -- ============================================
 CREATE TABLE IF NOT EXISTS campaigns (
@@ -65,6 +77,7 @@ CREATE TABLE IF NOT EXISTS campaigns (
     -- Phishing configuration
     phish_domain VARCHAR(255) DEFAULT 'random',
     landing_page_id UUID REFERENCES landing_pages(id) ON DELETE SET NULL,
+    attachment_id UUID REFERENCES attachments(id) ON DELETE SET NULL,
     add_clickers_to_group VARCHAR(100),
     send_report_email BOOLEAN DEFAULT true,
 
@@ -82,7 +95,7 @@ CREATE TABLE IF NOT EXISTS campaigns (
 CREATE TABLE IF NOT EXISTS events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     campaign_id UUID NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
-    type VARCHAR(50) NOT NULL CHECK (type IN ('opened', 'clicked', 'submitted')),
+    type VARCHAR(50) NOT NULL CHECK (type IN ('opened', 'clicked', 'submitted', 'file_downloaded')),
     recipient_token VARCHAR(255) NOT NULL,
     ip_address VARCHAR(45),
     user_agent TEXT,
@@ -169,6 +182,42 @@ INSERT INTO email_templates (name, subject, body, category, is_default) VALUES
     <p><a href="{{trackingLink}}">Güncellemeyi indirmek için tıklayın</a></p>
     <p>Eski sürüm 1 hafta sonra devre dışı kalacaktır.</p>
     <p>IT Destek Ekibi</p>',
+    'it',
+    false
+),
+(
+    'Sınav Sonuçları - Dosya Eki',
+    'Bahar Dönemi Sınav Sonuçlarınız Yayınlandı',
+    '<p>Sayın {{firstName}} {{lastName}},</p>
+    <p>2025-2026 Bahar Dönemi sınav sonuçlarınız açıklanmıştır.</p>
+    <p>Sonuçlarınızı aşağıdaki bağlantıdan indirebilirsiniz:</p>
+    <p>{{downloadButton}}</p>
+    <p>Sonuçlarla ilgili itiraz süresi <strong>5 iş günüdür</strong>.</p>
+    <p>Saygılarımızla,<br>Öğrenci İşleri Daire Başkanlığı</p>',
+    'general',
+    false
+),
+(
+    'Maaş İyileştirme - Dosya Eki',
+    'Personel Maaş İyileştirme Listesi Yayınlandı',
+    '<p>Sayın {{firstName}} {{lastName}},</p>
+    <p>2026 yılı personel maaş iyileştirme listesi yayınlanmıştır.</p>
+    <p>Güncel listeyi görüntülemek için aşağıdaki bağlantıya tıklayın:</p>
+    <p>{{downloadButton}}</p>
+    <p>Liste, Rektörlük onayı ile kesinleşmiştir.</p>
+    <p>Saygılarımızla,<br>İnsan Kaynakları Daire Başkanlığı</p>',
+    'hr',
+    false
+),
+(
+    'IT Güvenlik Politikası - Dosya Eki',
+    'Yeni Bilgi Güvenliği Politikası Dökümanı',
+    '<p>Merhaba {{firstName}},</p>
+    <p>Üniversitemiz Bilgi İşlem Daire Başkanlığı tarafından hazırlanan yeni bilgi güvenliği politikası yürürlüğe girmiştir.</p>
+    <p>Politika dökümanını aşağıdan indirebilirsiniz:</p>
+    <p>{{downloadButton}}</p>
+    <p>Tüm personelin bu dökümanı inceleyip onaylaması <strong>zorunludur</strong>.</p>
+    <p>Bilgi İşlem Daire Başkanlığı</p>',
     'it',
     false
 );
