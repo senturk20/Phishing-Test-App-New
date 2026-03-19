@@ -39,6 +39,7 @@ interface CreateCampaignBody {
   templateId?: string;
   phishDomain?: string;
   landingPageId?: string;
+  attachmentId?: string;
   addClickersToGroup?: string;
   sendReportEmail?: boolean;
 }
@@ -123,6 +124,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       templateId: b.templateId,
       phishDomain: b.phishDomain,
       landingPageId: b.landingPageId,
+      attachmentId: b.attachmentId,
       addClickersToGroup: b.addClickersToGroup,
       sendReportEmail: b.sendReportEmail,
     });

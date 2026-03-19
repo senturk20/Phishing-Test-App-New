@@ -111,6 +111,27 @@ export async function enqueueEmailBatch(jobs: EmailJobData[]): Promise<void> {
   );
 }
 
+/**
+ * Enqueue emails with individual per-recipient delays (for spread mode).
+ * Each job gets a BullMQ `delay` in milliseconds so it stays in the
+ * "delayed" state until its scheduled send time arrives.
+ */
+export async function enqueueEmailWithDelay(
+  jobs: Array<{ data: EmailJobData; delayMs: number }>
+): Promise<void> {
+  const queue = getEmailQueue();
+  await queue.addBulk(
+    jobs.map(({ data, delayMs }) => ({
+      name: 'send-email',
+      data,
+      opts: {
+        jobId: `email-${data.recipientToken}`,
+        delay: delayMs,
+      },
+    }))
+  );
+}
+
 export async function getQueueStats(): Promise<{
   waiting: number;
   active: number;

@@ -326,7 +326,7 @@ export function LandingPages() {
                   mb="md"
                   style={{
                     borderRadius: 'var(--mantine-radius-md)',
-                    backgroundColor: 'var(--mantine-color-dark-5)',
+                    backgroundColor: 'var(--app-shell-bg)',
                     overflow: 'hidden',
                     height: 120,
                     position: 'relative',
@@ -491,8 +491,8 @@ export function LandingPages() {
         size="95vw"
         styles={{
           body: { height: '80vh', display: 'flex', flexDirection: 'column' },
-          content: { backgroundColor: 'var(--mantine-color-dark-7)' },
-          header: { backgroundColor: 'var(--mantine-color-dark-7)' },
+          content: { backgroundColor: 'var(--app-shell-bg)' },
+          header: { backgroundColor: 'var(--app-shell-bg)' },
         }}
       >
         <Tabs value={builderTab} onChange={setBuilderTab} style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -522,8 +522,8 @@ export function LandingPages() {
                 <Card
                   padding="xl"
                   style={{
-                    backgroundColor: 'var(--mantine-color-dark-6)',
-                    border: '1px solid var(--mantine-color-dark-4)',
+                    backgroundColor: 'var(--app-surface)',
+                    border: '1px solid var(--app-border)',
                   }}
                 >
                   <Stack gap="md" align="center">
@@ -573,8 +573,8 @@ export function LandingPages() {
                 <Card
                   padding="xl"
                   style={{
-                    backgroundColor: 'var(--mantine-color-dark-6)',
-                    border: '1px solid var(--mantine-color-dark-4)',
+                    backgroundColor: 'var(--app-surface)',
+                    border: '1px solid var(--app-border)',
                   }}
                 >
                   <Stack gap="md" align="center">
@@ -667,7 +667,7 @@ export function LandingPages() {
             <Box
               style={{
                 flex: 1,
-                border: '1px solid var(--mantine-color-dark-4)',
+                border: '1px solid var(--app-border)',
                 borderRadius: 'var(--mantine-radius-md)',
                 overflow: 'hidden',
               }}
@@ -713,7 +713,7 @@ export function LandingPages() {
                 style={{
                   flex: 1,
                   height: '100%',
-                  border: '1px solid var(--mantine-color-dark-4)',
+                  border: '1px solid var(--app-border)',
                   borderRadius: 'var(--mantine-radius-md)',
                   overflow: 'hidden',
                   backgroundColor: '#fff',

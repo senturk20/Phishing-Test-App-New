@@ -23,6 +23,7 @@ export {
   updateRecipientStatus,
   deleteRecipient,
   getRecipientByToken,
+  getAllRecipients,
 } from './recipientService.js';
 
 // Template Service
@@ -54,10 +55,19 @@ export type { SendEmailParams } from './mailService.js';
 export {
   isRedisAvailable,
   enqueueEmailBatch,
+  enqueueEmailWithDelay,
   getQueueStats,
   closeQueue,
 } from './queueService.js';
 export type { EmailJobData } from './queueService.js';
+
+// Scheduler Service
+export {
+  calculateNextSendTime,
+  calculateSendDelays,
+  startCompletionChecker,
+  stopCompletionChecker,
+} from './schedulerService.js';
 
 // Mail Worker
 export { startMailWorker, stopMailWorker } from './mailWorker.js';

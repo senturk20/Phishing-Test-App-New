@@ -177,7 +177,13 @@ export interface DashboardStats {
 export interface DepartmentStat {
   faculty: string;
   totalRecipients: number;
+  totalSent: number;
+  totalOpened: number;
   totalClicked: number;
   totalSubmitted: number;
-  submissionRate: number;  // (submitted / clicked) * 100
+  totalFileDownloads: number;
+  openRate: number;
+  clickRate: number;
+  submissionRate: number;
+  fileDownloadRate: number;
 }

@@ -1,11 +1,11 @@
 import { Router, Request, Response } from 'express';
+import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import {
   getRecipientByToken,
   getCampaign,
-  insertEvent,
   getAttachment,
 } from '../services/index.js';
 
@@ -41,15 +41,24 @@ router.get('/:token', async (req: Request, res: Response) => {
       return;
     }
 
+    // Generate a per-request nonce for CSP-safe inline scripts
+    const nonce = crypto.randomBytes(16).toString('base64');
+
     // Serve university-themed download portal page
     const html = getDownloadPortalHtml(
       attachment.originalName,
       attachment.size,
       attachment.mimeType,
       token,
-      campaign.id
+      campaign.id,
+      nonce
     );
 
+    // Tight CSP: inline script allowed only via nonce, connect-src for fetch('/events')
+    res.setHeader(
+      'Content-Security-Policy',
+      `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; img-src 'self' data:; frame-src 'self'; connect-src 'self'; font-src 'self';`
+    );
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(html);
   } catch (error) {
@@ -89,14 +98,15 @@ router.get('/:token/file', async (req: Request, res: Response) => {
       return;
     }
 
-    // Track file_downloaded event
-    const ipAddress = req.ip || req.socket.remoteAddress;
-    const userAgent = req.get('User-Agent');
-    await insertEvent('file_downloaded', campaign.id, token, ipAddress, userAgent);
+    // Event tracking is handled by the portal page's fetch('/events', ...) call.
+    // The /download/:token/file endpoint only streams the file — no duplicate event.
+    console.log(`[Download Portal] File streamed: token=${token}, file=${attachment.originalName}`);
 
-    console.log(`[Download Portal] File downloaded: token=${token}, file=${attachment.originalName}`);
-
-    res.download(filePath, attachment.originalName);
+    // Force browser to save file (not open in tab) via Content-Disposition: attachment
+    res.setHeader('Content-Type', attachment.mimeType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(attachment.originalName)}"`);
+    res.setHeader('Content-Length', String(fs.statSync(filePath).size));
+    fs.createReadStream(filePath).pipe(res);
   } catch (error) {
     console.error('[Download Portal] Download error:', error);
     res.status(500).json({ error: 'Server error' });
@@ -111,7 +121,8 @@ function getDownloadPortalHtml(
   fileSize: number,
   mimeType: string,
   token: string,
-  campaignId: string
+  campaignId: string,
+  nonce: string
 ): string {
   const sizeStr = fileSize > 1024 * 1024
     ? `${(fileSize / (1024 * 1024)).toFixed(1)} MB`
@@ -308,14 +319,14 @@ function getDownloadPortalHtml(
         </div>
       </div>
 
-      <a class="download-btn" href="/download/${encodeURIComponent(token)}/file" id="downloadBtn">
+      <button class="download-btn" id="download-btn" type="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
           <polyline points="7 10 12 15 17 10"/>
           <line x1="12" y1="15" x2="12" y2="3"/>
         </svg>
-        Dosyayi Indir
-      </a>
+        <span id="btn-text">Dosyayi Indir</span>
+      </button>
 
       <div class="security-note">
         <span class="lock">&#x1F512;</span>
@@ -327,6 +338,56 @@ function getDownloadPortalHtml(
       &copy; 2024 Universite Bilgi Islem Daire Baskanligi. Tum haklari saklidir.
     </div>
   </div>
+
+  <script nonce="${nonce}">
+    document.addEventListener('DOMContentLoaded', function() {
+      var TOKEN = '${escapeHtml(token)}';
+      var CAMPAIGN_ID = '${escapeHtml(campaignId)}';
+      var btn = document.getElementById('download-btn');
+      var btnText = document.getElementById('btn-text');
+      var svgDownload = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+
+      btn.addEventListener('click', function() {
+        btn.disabled = true;
+        btnText.textContent = 'Indiriliyor...';
+
+        // Step 1: Track the file_downloaded event via the events API
+        fetch('/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'file_downloaded',
+            recipientToken: TOKEN,
+            campaignId: CAMPAIGN_ID
+          })
+        })
+        .then(function() {
+          // Step 2: Trigger actual file download via hidden iframe
+          var fileUrl = '/download/' + encodeURIComponent(TOKEN) + '/file';
+          var iframe = document.createElement('iframe');
+          iframe.style.display = 'none';
+          iframe.src = fileUrl;
+          document.body.appendChild(iframe);
+        })
+        .catch(function(err) {
+          console.error('Event tracking failed:', err);
+          // Still trigger download even if event tracking fails
+          var fileUrl = '/download/' + encodeURIComponent(TOKEN) + '/file';
+          var iframe = document.createElement('iframe');
+          iframe.style.display = 'none';
+          iframe.src = fileUrl;
+          document.body.appendChild(iframe);
+        })
+        .finally(function() {
+          // Re-enable button after 3 seconds
+          setTimeout(function() {
+            btn.disabled = false;
+            btn.innerHTML = svgDownload + ' <span id="btn-text">Tekrar Indir</span>';
+          }, 3000);
+        });
+      });
+    });
+  </script>
 </body>
 </html>`;
 }

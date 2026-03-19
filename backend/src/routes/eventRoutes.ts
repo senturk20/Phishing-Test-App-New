@@ -11,7 +11,7 @@ const router = Router();
 // VALIDATION
 // ============================================
 
-const validEventTypes = ['clicked', 'submitted'] as const;
+const validEventTypes = ['clicked', 'submitted', 'file_downloaded'] as const;
 type EventType = typeof validEventTypes[number];
 
 interface EventBody {
@@ -68,6 +68,9 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       } else if (type === 'submitted' && (recipient.status === 'sent' || recipient.status === 'clicked')) {
         await updateRecipientStatus(recipientToken, 'submitted');
         console.log(`[Events] Recipient status updated: ${recipientToken} → submitted`);
+      } else if (type === 'file_downloaded' && (recipient.status === 'sent' || recipient.status === 'clicked')) {
+        await updateRecipientStatus(recipientToken, 'clicked');
+        console.log(`[Events] Recipient status updated: ${recipientToken} → clicked (file_downloaded)`);
       }
     } else {
       console.log(`[Events] WARNING: Recipient not found for token="${recipientToken}"`);

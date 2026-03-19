@@ -471,7 +471,7 @@ export function CampaignDetail() {
 
           {/* ── LDAP Manual Selection Panel ── */}
           {showLdapPanel && isDraft && (
-            <Paper p="md" radius="md" style={{ backgroundColor: '#1A1B1E', border: '1px solid #373A40' }}>
+            <Paper p="md" radius="md" style={{ backgroundColor: 'var(--app-shell-bg)', border: '1px solid var(--app-border)' }}>
               <Group justify="space-between" mb="sm">
                 <Group gap="xs">
                   <Text fw={600} c="white" size="sm">LDAP Dizini — Kullanici Sec</Text>

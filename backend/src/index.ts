@@ -34,6 +34,8 @@ import {
   closeQueue,
   seedDefaultAdminIfNeeded,
   getLandingPage,
+  startCompletionChecker,
+  stopCompletionChecker,
 } from './services/index.js';
 import { verifyToken } from './middleware/auth.js';
 
@@ -90,6 +92,13 @@ app.use('/static', express.static(path.join(__dirname, '../static'), {
 // Must be BEFORE helmet/CSP — tracking pages have inline scripts.
 // ============================================
 app.use('/t', trackingRoutes);
+
+// ============================================
+// DOWNLOAD PORTAL (before security middleware)
+// Must be BEFORE helmet — the portal page uses an inline <script>
+// to handle the download button click via addEventListener (CSP 'self').
+// ============================================
+app.use('/download', downloadRoutes);
 
 // ============================================
 // LANDING PAGE PREVIEW (before security middleware)
@@ -223,7 +232,7 @@ app.get('/health', async (_req: Request, res: Response) => {
 
 app.use('/auth', authRoutes);
 app.use('/p', phishingRoutes);
-app.use('/download', downloadRoutes);
+// /download is mounted earlier (before helmet) — see above
 app.use('/events', eventRoutes);      // Direct calls (api.ts, LandingPage.tsx)
 app.use('/api/events', eventRoutes);  // DB-seeded landing pages use /api/events (legacy nginx convention)
 
@@ -332,6 +341,9 @@ async function startServer() {
     console.error('[Queue] Failed to check Redis:', err);
   });
 
+  // Start the campaign completion checker (auto-completes campaigns after trackActivityDays)
+  startCompletionChecker();
+
   const server = app.listen(config.port, () => {
     console.log(`[Boot] Server running on port ${config.port}`);
   });
@@ -346,6 +358,7 @@ async function startServer() {
     console.log('[Shutdown] Shutting down gracefully...');
     server.close(async () => {
       try {
+        stopCompletionChecker();
         await stopMailWorker();
         await closeQueue();
         closeLdapConnection();

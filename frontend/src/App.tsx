@@ -10,6 +10,8 @@ import { LandingPages } from './pages/LandingPages';
 import { LandingPage } from './pages/LandingPage';
 import { EmailTemplates } from './pages/EmailTemplates';
 import { FileManager } from './pages/FileManager';
+import { UserList } from './pages/UserList';
+import { DepartmentAnalysis } from './pages/DepartmentAnalysis';
 import { Center, Loader } from '@mantine/core';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -17,7 +19,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (isLoading) {
     return (
-      <Center style={{ minHeight: '100vh', backgroundColor: 'var(--mantine-color-dark-8)' }}>
+      <Center style={{ minHeight: '100vh', backgroundColor: 'var(--app-shell-bg)' }}>
         <Loader color="electricBlue" size="lg" />
       </Center>
     );
@@ -40,7 +42,7 @@ function AppRoutes() {
         path="/login"
         element={
           isLoading ? (
-            <Center style={{ minHeight: '100vh', backgroundColor: 'var(--mantine-color-dark-8)' }}>
+            <Center style={{ minHeight: '100vh', backgroundColor: 'var(--app-shell-bg)' }}>
               <Loader color="electricBlue" size="lg" />
             </Center>
           ) : isAuthenticated ? (
@@ -67,6 +69,8 @@ function AppRoutes() {
         <Route path="landing-pages" element={<LandingPages />} />
         <Route path="email-templates" element={<EmailTemplates />} />
         <Route path="file-manager" element={<FileManager />} />
+        <Route path="users" element={<UserList />} />
+        <Route path="department-analysis" element={<DepartmentAnalysis />} />
       </Route>
 
       {/* Phishing Landing Page (Layout disinda, public) */}

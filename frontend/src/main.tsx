@@ -1,8 +1,8 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { MantineProvider } from '@mantine/core';
+import { MantineProvider, ColorSchemeScript } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
-import { theme } from './theme';
+import { theme, cssVariablesResolver } from './theme';
 import App from './App';
 
 import '@mantine/core/styles.css';
@@ -11,7 +11,12 @@ import './global.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <MantineProvider theme={theme} forceColorScheme="dark">
+    <ColorSchemeScript defaultColorScheme="dark" />
+    <MantineProvider
+      theme={theme}
+      defaultColorScheme="dark"
+      cssVariablesResolver={cssVariablesResolver}
+    >
       <Notifications position="top-right" />
       <App />
     </MantineProvider>

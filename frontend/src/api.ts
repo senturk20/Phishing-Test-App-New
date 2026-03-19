@@ -86,6 +86,16 @@ export const api = {
   // Dashboard
   getDashboardStats: () => request<DashboardStats>('/dashboard/stats'),
   getDepartmentStats: () => request<DepartmentStat[]>('/dashboard/departments'),
+  getAllUsers: (params?: { page?: number; pageSize?: number; faculty?: string; search?: string; status?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.page) q.set('page', String(params.page));
+    if (params?.pageSize) q.set('pageSize', String(params.pageSize));
+    if (params?.faculty) q.set('faculty', params.faculty);
+    if (params?.search) q.set('search', params.search);
+    if (params?.status) q.set('status', params.status);
+    const qs = q.toString();
+    return request<{ users: Recipient[]; total: number; page: number; pageSize: number }>(`/dashboard/users${qs ? `?${qs}` : ''}`);
+  },
 
   // Campaigns
   getCampaigns: () => request<Campaign[]>('/campaigns'),

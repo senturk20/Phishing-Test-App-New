@@ -124,26 +124,38 @@ export async function getDepartmentStats(): Promise<DepartmentStat[]> {
     const recipients = memoryStore.recipients;
     const events = memoryStore.events;
 
+    const sentTokens = new Set(recipients.filter(r => r.status !== 'pending').map(r => r.token));
+    const openedTokens = new Set(events.filter(e => e.type === 'opened').map(e => e.recipientToken));
     const clickedTokens = new Set(events.filter(e => e.type === 'clicked').map(e => e.recipientToken));
     const submittedTokens = new Set(events.filter(e => e.type === 'submitted').map(e => e.recipientToken));
+    const downloadTokens = new Set(events.filter(e => e.type === 'file_downloaded').map(e => e.recipientToken));
 
-    const facultyMap = new Map<string, { total: number; clicked: number; submitted: number }>();
+    const facultyMap = new Map<string, { total: number; sent: number; opened: number; clicked: number; submitted: number; downloaded: number }>();
 
     for (const r of recipients) {
       const fac = r.faculty || 'Ozel Gonderim';
-      if (!facultyMap.has(fac)) facultyMap.set(fac, { total: 0, clicked: 0, submitted: 0 });
+      if (!facultyMap.has(fac)) facultyMap.set(fac, { total: 0, sent: 0, opened: 0, clicked: 0, submitted: 0, downloaded: 0 });
       const entry = facultyMap.get(fac)!;
       entry.total++;
+      if (sentTokens.has(r.token)) entry.sent++;
+      if (openedTokens.has(r.token)) entry.opened++;
       if (clickedTokens.has(r.token)) entry.clicked++;
       if (submittedTokens.has(r.token)) entry.submitted++;
+      if (downloadTokens.has(r.token)) entry.downloaded++;
     }
 
-    return Array.from(facultyMap.entries()).map(([faculty, data]) => ({
+    return Array.from(facultyMap.entries()).map(([faculty, d]) => ({
       faculty,
-      totalRecipients: data.total,
-      totalClicked: data.clicked,
-      totalSubmitted: data.submitted,
-      submissionRate: data.clicked > 0 ? (data.submitted / data.clicked) * 100 : 0,
+      totalRecipients: d.total,
+      totalSent: d.sent,
+      totalOpened: d.opened,
+      totalClicked: d.clicked,
+      totalSubmitted: d.submitted,
+      totalFileDownloads: d.downloaded,
+      openRate: d.sent > 0 ? (d.opened / d.sent) * 100 : 0,
+      clickRate: d.sent > 0 ? (d.clicked / d.sent) * 100 : 0,
+      submissionRate: d.clicked > 0 ? (d.submitted / d.clicked) * 100 : 0,
+      fileDownloadRate: d.sent > 0 ? (d.downloaded / d.sent) * 100 : 0,
     }));
   }
 
@@ -154,24 +166,39 @@ export async function getDepartmentStats(): Promise<DepartmentStat[]> {
     SELECT
       COALESCE(NULLIF(r.faculty, ''), 'Ozel Gonderim') AS faculty,
       COUNT(DISTINCT r.id) AS total_recipients,
+      COUNT(DISTINCT CASE WHEN r.status != 'pending' THEN r.token END) AS total_sent,
+      COUNT(DISTINCT CASE WHEN e_open.recipient_token IS NOT NULL THEN r.token END) AS total_opened,
       COUNT(DISTINCT CASE WHEN e_click.recipient_token IS NOT NULL THEN r.token END) AS total_clicked,
-      COUNT(DISTINCT CASE WHEN e_submit.recipient_token IS NOT NULL THEN r.token END) AS total_submitted
+      COUNT(DISTINCT CASE WHEN e_submit.recipient_token IS NOT NULL THEN r.token END) AS total_submitted,
+      COUNT(DISTINCT CASE WHEN e_dl.recipient_token IS NOT NULL THEN r.token END) AS total_downloads
     FROM recipients r
+    LEFT JOIN events e_open ON e_open.recipient_token = r.token AND e_open.type = 'opened'
     LEFT JOIN events e_click ON e_click.recipient_token = r.token AND e_click.type = 'clicked'
     LEFT JOIN events e_submit ON e_submit.recipient_token = r.token AND e_submit.type = 'submitted'
+    LEFT JOIN events e_dl ON e_dl.recipient_token = r.token AND e_dl.type = 'file_downloaded'
     GROUP BY COALESCE(NULLIF(r.faculty, ''), 'Ozel Gonderim')
     ORDER BY total_recipients DESC
   `);
 
-  return result.rows.map((row: { faculty: string; total_recipients: string; total_clicked: string; total_submitted: string }) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return result.rows.map((row: any) => {
+    const sent = parseInt(row.total_sent, 10);
+    const opened = parseInt(row.total_opened, 10);
     const clicked = parseInt(row.total_clicked, 10);
     const submitted = parseInt(row.total_submitted, 10);
+    const downloads = parseInt(row.total_downloads, 10);
     return {
       faculty: row.faculty,
       totalRecipients: parseInt(row.total_recipients, 10),
+      totalSent: sent,
+      totalOpened: opened,
       totalClicked: clicked,
       totalSubmitted: submitted,
+      totalFileDownloads: downloads,
+      openRate: sent > 0 ? (opened / sent) * 100 : 0,
+      clickRate: sent > 0 ? (clicked / sent) * 100 : 0,
       submissionRate: clicked > 0 ? (submitted / clicked) * 100 : 0,
+      fileDownloadRate: sent > 0 ? (downloads / sent) * 100 : 0,
     };
   });
 }

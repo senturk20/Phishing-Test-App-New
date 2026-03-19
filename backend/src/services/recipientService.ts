@@ -282,3 +282,119 @@ export async function getRecipientByToken(token: string): Promise<Recipient | nu
     updatedAt: row.updated_at,
   };
 }
+
+// ============================================
+// GET ALL RECIPIENTS (paginated, cross-campaign)
+// ============================================
+
+export interface AllRecipientsResult {
+  users: Recipient[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export async function getAllRecipients(opts: {
+  page?: number;
+  pageSize?: number;
+  faculty?: string;
+  search?: string;
+  status?: string;
+}): Promise<AllRecipientsResult> {
+  const page = Math.max(1, opts.page || 1);
+  const pageSize = Math.min(100, Math.max(1, opts.pageSize || 25));
+  const offset = (page - 1) * pageSize;
+
+  if (config.useMemoryDb) {
+    let list = [...memoryStore.recipients];
+
+    // Deduplicate by email — keep the most recent entry per user
+    const emailMap = new Map<string, typeof list[0]>();
+    for (const r of list) {
+      const existing = emailMap.get(r.email);
+      if (!existing || r.createdAt.getTime() > existing.createdAt.getTime()) {
+        emailMap.set(r.email, r);
+      }
+    }
+    list = Array.from(emailMap.values());
+
+    if (opts.faculty) list = list.filter(r => r.faculty === opts.faculty);
+    if (opts.status) list = list.filter(r => r.status === opts.status);
+    if (opts.search) {
+      const q = opts.search.toLowerCase();
+      list = list.filter(r =>
+        r.email.toLowerCase().includes(q) ||
+        r.firstName.toLowerCase().includes(q) ||
+        r.lastName.toLowerCase().includes(q)
+      );
+    }
+
+    list.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    return { users: list.slice(offset, offset + pageSize), total: list.length, page, pageSize };
+  }
+
+  const p = await getPool();
+  if (!p) return { users: [], total: 0, page, pageSize };
+
+  const conditions: string[] = [];
+  const params: (string | number)[] = [];
+  let paramIdx = 1;
+
+  if (opts.faculty) {
+    conditions.push(`r.faculty = $${paramIdx++}`);
+    params.push(opts.faculty);
+  }
+  if (opts.status) {
+    conditions.push(`r.status = $${paramIdx++}`);
+    params.push(opts.status);
+  }
+  if (opts.search) {
+    conditions.push(`(r.email ILIKE $${paramIdx} OR r.first_name ILIKE $${paramIdx} OR r.last_name ILIKE $${paramIdx})`);
+    params.push(`%${opts.search}%`);
+    paramIdx++;
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  // Deduplicate by email, keep most recent per user
+  const baseQuery = `
+    FROM (
+      SELECT DISTINCT ON (r.email)
+        r.id, r.campaign_id, r.email, r.first_name, r.last_name,
+        r.department, r.faculty, r.role, r.token, r.status,
+        r.sent_at, r.clicked_at, r.submitted_at, r.created_at, r.updated_at
+      FROM recipients r
+      ${where}
+      ORDER BY r.email, r.created_at DESC
+    ) r
+  `;
+
+  const countResult = await p.query(`SELECT COUNT(*) as count ${baseQuery}`, params);
+  const total = parseInt(countResult.rows[0].count, 10);
+
+  const dataResult = await p.query(
+    `SELECT * ${baseQuery} ORDER BY r.created_at DESC LIMIT $${paramIdx++} OFFSET $${paramIdx++}`,
+    [...params, pageSize, offset]
+  );
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const users: Recipient[] = dataResult.rows.map((row: any) => ({
+    id: row.id,
+    campaignId: row.campaign_id,
+    email: row.email,
+    firstName: row.first_name || '',
+    lastName: row.last_name || '',
+    department: row.department || '',
+    faculty: row.faculty || '',
+    role: row.role || '',
+    token: row.token,
+    status: row.status,
+    sentAt: row.sent_at ?? undefined,
+    clickedAt: row.clicked_at ?? undefined,
+    submittedAt: row.submitted_at ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
+
+  return { users, total, page, pageSize };
+}

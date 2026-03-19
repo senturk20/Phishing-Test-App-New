@@ -20,6 +20,11 @@ export default defineConfig({
         target: 'http://backend:8080',
         changeOrigin: true,
       },
+      // Download portal — attachment download pages and file streams
+      '/download/': {
+        target: 'http://backend:8080',
+        changeOrigin: true,
+      },
       // Static clone assets — CSS/JS/images for cloned landing pages
       '/static/': {
         target: 'http://backend:8080',

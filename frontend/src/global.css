@@ -1,9 +1,38 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { line-height: 1.5; }
-
-::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: #1A1B1E; }
-::-webkit-scrollbar-thumb { background: #373A40; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: #5C5F66; }
-
 a { text-decoration: none; color: inherit; }
+
+/* Smooth theme transition on all color/background properties */
+*,
+*::before,
+*::after {
+  transition:
+    background-color 200ms ease,
+    border-color 200ms ease;
+}
+/* Opt-out: inputs/buttons should not lag */
+input, button, textarea, select {
+  transition: none;
+}
+
+/* ── Scrollbar: Dark mode ── */
+[data-mantine-color-scheme="dark"] ::-webkit-scrollbar { width: 8px; height: 8px; }
+[data-mantine-color-scheme="dark"] ::-webkit-scrollbar-track { background: #1A1B1E; }
+[data-mantine-color-scheme="dark"] ::-webkit-scrollbar-thumb { background: #373A40; border-radius: 4px; }
+[data-mantine-color-scheme="dark"] ::-webkit-scrollbar-thumb:hover { background: #5C5F66; }
+
+/* ── Scrollbar: Light mode ── */
+[data-mantine-color-scheme="light"] ::-webkit-scrollbar { width: 8px; height: 8px; }
+[data-mantine-color-scheme="light"] ::-webkit-scrollbar-track { background: #f0f2f5; }
+[data-mantine-color-scheme="light"] ::-webkit-scrollbar-thumb { background: #ced4da; border-radius: 4px; }
+[data-mantine-color-scheme="light"] ::-webkit-scrollbar-thumb:hover { background: #adb5bd; }
+
+/*
+ * Global light-mode text fix:
+ * Mantine's c="white" sets `--_tc: var(--mantine-color-white)` inline.
+ * In light mode we remap all explicit-white text/title elements to use the
+ * theme's default dark text colour so headings remain readable.
+ */
+[data-mantine-color-scheme="light"] :is(.mantine-Text-root, .mantine-Title-root)[style*="white"] {
+  color: var(--app-text-primary) !important;
+}

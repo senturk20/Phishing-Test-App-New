@@ -379,7 +379,7 @@ export function EmailTemplates() {
               {selectedTemplate.isDefault && <Badge color="cyberGreen" variant="light">Varsayilan</Badge>}
             </Group>
 
-            <Card withBorder style={{ borderColor: 'var(--mantine-color-dark-4)' }}>
+            <Card withBorder style={{ borderColor: 'var(--app-border)' }}>
               <Stack gap="xs" mb="md">
                 <Group gap="xs">
                   <Text size="sm" fw={600} c="dimmed" w={60}>Kimden:</Text>
@@ -520,7 +520,7 @@ export function EmailTemplates() {
           {/* Step 2: Preview */}
           {createStep === 2 && (
             <Stack gap="md">
-              <Card withBorder style={{ borderColor: 'var(--mantine-color-dark-4)' }}>
+              <Card withBorder style={{ borderColor: 'var(--app-border)' }}>
                 <Stack gap="xs" mb="md">
                   <Group gap="xs">
                     <Text size="sm" fw={600} c="dimmed" w={80}>Sablon Adi:</Text>
@@ -539,7 +539,7 @@ export function EmailTemplates() {
                 </Stack>
               </Card>
 
-              <Card withBorder style={{ borderColor: 'var(--mantine-color-dark-4)' }}>
+              <Card withBorder style={{ borderColor: 'var(--app-border)' }}>
                 <Text size="sm" fw={600} c="dimmed" mb="sm">E-posta Onizleme:</Text>
                 <TypographyStylesProvider>
                   <div dangerouslySetInnerHTML={{ __html: newTemplate.body }} />
@@ -547,7 +547,7 @@ export function EmailTemplates() {
               </Card>
 
               {/* Show detected placeholders */}
-              <Card withBorder style={{ borderColor: 'var(--mantine-color-dark-4)' }}>
+              <Card withBorder style={{ borderColor: 'var(--app-border)' }}>
                 <Text size="sm" fw={600} c="dimmed" mb="xs">Kullanilan Yer Tutucular:</Text>
                 <Group gap="xs">
                   {PLACEHOLDERS.filter(p =>

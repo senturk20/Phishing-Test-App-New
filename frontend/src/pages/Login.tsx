@@ -41,7 +41,7 @@ export function Login() {
     <Center
       style={{
         minHeight: '100vh',
-        backgroundColor: 'var(--mantine-color-dark-8)',
+        backgroundColor: 'var(--app-shell-bg)',
       }}
     >
       <Paper
@@ -50,8 +50,8 @@ export function Login() {
         radius="md"
         w={400}
         style={{
-          backgroundColor: 'var(--mantine-color-dark-6)',
-          border: '1px solid var(--mantine-color-dark-4)',
+          backgroundColor: 'var(--app-surface)',
+          border: '1px solid var(--app-border)',
         }}
       >
         <Stack align="center" gap="xs" mb="lg">
@@ -83,9 +83,6 @@ export function Login() {
               value={username}
               onChange={(e) => setUsername(e.currentTarget.value)}
               required
-              styles={{
-                label: { color: 'var(--mantine-color-dark-1)' },
-              }}
             />
             <PasswordInput
               label="Sifre"
@@ -93,9 +90,6 @@ export function Login() {
               value={password}
               onChange={(e) => setPassword(e.currentTarget.value)}
               required
-              styles={{
-                label: { color: 'var(--mantine-color-dark-1)' },
-              }}
             />
             <Button
               type="submit"

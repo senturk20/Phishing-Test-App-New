@@ -4,8 +4,9 @@ import type { Campaign, CampaignStats } from '../types/index.js';
 import { getRecipientsByCampaign, updateRecipientStatus } from './recipientService.js';
 import { getEmailTemplate, getEmailTemplates } from './templateService.js';
 import { sendEmail } from './mailService.js';
-import { isRedisAvailable, enqueueEmailBatch } from './queueService.js';
+import { isRedisAvailable, enqueueEmailBatch, enqueueEmailWithDelay } from './queueService.js';
 import type { EmailJobData } from './queueService.js';
+import { calculateSendDelays } from './schedulerService.js';
 import pLimit from 'p-limit';
 
 // ============================================
@@ -21,18 +22,51 @@ function replacePlaceholders(
 ): string {
   const fullName = [recipient.firstName, recipient.lastName].filter(Boolean).join(' ');
 
-  // Build a styled download button for {{downloadLink}} placeholder
-  const downloadHtml = downloadLink
-    ? `<a href="${downloadLink}" style="display:inline-block;padding:12px 28px;background:#1e3a5f;color:#ffffff;text-decoration:none;border-radius:6px;font-family:'Segoe UI',Tahoma,sans-serif;font-size:15px;font-weight:600;border:1px solid #2d5a8e;letter-spacing:0.3px;" target="_blank">&#128196; Dosyayi Goruntule</a>`
-    : '';
+  // Resolve the effective download URL
+  const dlUrl = downloadLink || '';
+
+  console.log(`[replacePlaceholders] recipient=${recipient.email}, downloadLink=${dlUrl || '(none)'}, trackingLink=${trackingLink}`);
+
+  // Build styled download button HTML.
+  // Uses simple, email-client-safe inline styles (no shorthand, no quotes in font-family).
+  // If dlUrl is present, render a visible button. Otherwise render nothing.
+  let downloadButtonHtml = '';
+  if (dlUrl) {
+    downloadButtonHtml = [
+      `<a href="${dlUrl}"`,
+      ` target="_blank"`,
+      ` style="`,
+        `display: inline-block;`,
+        `padding: 12px 28px;`,
+        `background-color: #1e3a5f;`,
+        `color: #ffffff;`,
+        `text-decoration: none;`,
+        `border-radius: 6px;`,
+        `font-family: Segoe UI, Tahoma, Geneva, Verdana, sans-serif;`,
+        `font-size: 15px;`,
+        `font-weight: 600;`,
+        `border: 1px solid #2d5a8e;`,
+        `letter-spacing: 0.3px;`,
+      `"`,
+      `>Dosyayi Goruntule</a>`,
+    ].join('');
+  }
+
+  // Warn if template uses download placeholders but no download URL was provided
+  if (!dlUrl && (text.includes('{{downloadLink}}') || text.includes('{{downloadButton}}'))) {
+    console.warn(
+      `[replacePlaceholders] WARNING: Template uses {{downloadLink}}/{{downloadButton}} ` +
+      `but no attachmentId on campaign. Recipient: ${recipient.email}`
+    );
+  }
 
   return text
     .replace(/\{\{firstName\}\}/g, recipient.firstName || '')
     .replace(/\{\{lastName\}\}/g, recipient.lastName || '')
     .replace(/\{\{name\}\}/g, fullName)
     .replace(/\{\{trackingLink\}\}/g, trackingLink)
-    .replace(/\{\{downloadLink\}\}/g, downloadLink || trackingLink)
-    .replace(/\{\{downloadButton\}\}/g, downloadHtml)
+    .replace(/\{\{downloadLink\}\}/g, dlUrl || trackingLink)
+    .replace(/\{\{downloadButton\}\}/g, downloadButtonHtml)
     .replace(/\{\{link\}\}/g, trackingLink)
     .replace(/\{\{email\}\}/g, recipient.email)
     .replace(/\{\{phish_domain\}\}/g, phishDomain)
@@ -490,6 +524,7 @@ export async function startCampaign(id: string): Promise<Campaign | null> {
         templateId: row.template_id,
         phishDomain: row.phish_domain,
         landingPageId: row.landing_page_id,
+        attachmentId: row.attachment_id,
         addClickersToGroup: row.add_clickers_to_group,
         sendReportEmail: row.send_report_email,
         nextRunAt: row.next_run_at,
@@ -533,65 +568,95 @@ export async function startCampaign(id: string): Promise<Campaign | null> {
   const recipients = await getRecipientsByCampaign(id);
   const phishDomain = campaign.phishDomain || 'secure-login.com';
   const hasAttachment = !!campaign.attachmentId;
+  const isSpread = campaign.sendingMode === 'spread';
+
+  console.log(
+    `[Campaign Send] id=${campaign.id}, name=${campaign.name}, ` +
+    `attachmentId=${campaign.attachmentId || 'NULL'}, hasAttachment=${hasAttachment}, ` +
+    `mode=${campaign.sendingMode}, spread=${campaign.spreadDays}${campaign.spreadUnit === 'hours' ? 'h' : 'd'}`
+  );
+
+  // Pre-calculate per-recipient delays if spread mode is active
+  const delays = isSpread
+    ? calculateSendDelays(campaign, recipients.length)
+    : recipients.map(() => 0);
+
+  // Build email job data for each recipient
+  const jobDataList: EmailJobData[] = recipients.map((recipient) => {
+    const trackingLink = `${trackingBase}/t/${recipient.token}`;
+    const dlLink = hasAttachment ? `${trackingBase}/download/${recipient.token}` : undefined;
+    return {
+      recipientToken: recipient.token,
+      recipientEmail: recipient.email,
+      subject: replacePlaceholders(templateSubject, recipient, trackingLink, phishDomain, dlLink),
+      html: injectTrackingPixel(
+        replacePlaceholders(templateBody, recipient, trackingLink, phishDomain, dlLink),
+        trackingBase, recipient.token
+      ),
+      campaignId: campaign.id,
+      campaignName: campaign.name,
+    };
+  });
+
   const useQueue = await isRedisAvailable();
 
   if (useQueue) {
-    // --- Queue mode: enqueue all jobs in a single batch ---
-    const jobs: EmailJobData[] = recipients.map((recipient) => {
-      const trackingLink = `${trackingBase}/t/${recipient.token}`;
-      const dlLink = hasAttachment ? `${trackingBase}/download/${recipient.token}` : undefined;
-      return {
-        recipientToken: recipient.token,
-        recipientEmail: recipient.email,
-        subject: replacePlaceholders(templateSubject, recipient, trackingLink, phishDomain, dlLink),
-        html: injectTrackingPixel(
-          replacePlaceholders(templateBody, recipient, trackingLink, phishDomain, dlLink),
-          trackingBase, recipient.token
-        ),
-        campaignId: campaign.id,
-        campaignName: campaign.name,
-      };
-    });
-
-    await enqueueEmailBatch(jobs);
-    console.log(`Campaign "${campaign.name}": ${jobs.length} emails enqueued`);
+    if (isSpread) {
+      // --- Queue + Spread: enqueue each job with its calculated delay ---
+      const delayedJobs = jobDataList.map((data, i) => ({
+        data,
+        delayMs: delays[i],
+      }));
+      await enqueueEmailWithDelay(delayedJobs);
+      const lastDelayMin = Math.round((delays[delays.length - 1] || 0) / 60000);
+      console.log(
+        `[Scheduler] Campaign "${campaign.name}": ${jobDataList.length} emails enqueued with spread delays ` +
+        `(last email in ~${lastDelayMin} minutes)`
+      );
+    } else {
+      // --- Queue + All: enqueue all immediately ---
+      await enqueueEmailBatch(jobDataList);
+      console.log(`Campaign "${campaign.name}": ${jobDataList.length} emails enqueued (immediate)`);
+    }
   } else {
     // --- Direct mode: Redis unavailable, non-blocking fallback ---
     console.warn(
-      `[Campaign] ⚠ Redis is DOWN — sending ${recipients.length} emails in direct mode. ` +
+      `[Campaign] Redis is DOWN — sending ${recipients.length} emails in direct mode. ` +
       `This is a fallback; ensure Redis is running for production use.`
     );
 
     const campaignName = campaign.name;
     const totalRecipients = recipients.length;
-
-    // Fire-and-forget: send in background so the HTTP response returns immediately.
-    // Use p-limit to cap concurrency at 3 parallel sends, and yield between
-    // batches so the event loop stays free for health checks / API requests.
     const CONCURRENCY = 3;
     const limit = pLimit(CONCURRENCY);
 
     setImmediate(async () => {
       let sentCount = 0;
 
-      const tasks = recipients.map((recipient) =>
+      const tasks = jobDataList.map((jobData, index) =>
         limit(async () => {
           try {
-            const trackingLink = `${trackingBase}/t/${recipient.token}`;
-            const dlLink = hasAttachment ? `${trackingBase}/download/${recipient.token}` : undefined;
-            const html = injectTrackingPixel(
-              replacePlaceholders(templateBody, recipient, trackingLink, phishDomain, dlLink),
-              trackingBase, recipient.token
-            );
-            const subject = replacePlaceholders(templateSubject, recipient, trackingLink, phishDomain, dlLink);
+            // In spread mode, wait the calculated delay before sending
+            const delayMs = delays[index];
+            if (delayMs > 0) {
+              console.log(
+                `[Scheduler] Direct mode — waiting ${Math.round(delayMs / 1000)}s ` +
+                `for email ${index + 1}/${totalRecipients} to ${jobData.recipientEmail}`
+              );
+              await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+            }
 
-            const success = await sendEmail({ to: recipient.email, subject, html });
+            const success = await sendEmail({
+              to: jobData.recipientEmail,
+              subject: jobData.subject,
+              html: jobData.html,
+            });
             if (success) {
-              await updateRecipientStatus(recipient.token, 'sent');
+              await updateRecipientStatus(jobData.recipientToken, 'sent');
               sentCount++;
             }
           } catch (error) {
-            console.error(`Failed to send email to ${recipient.email}:`, error);
+            console.error(`Failed to send email to ${jobData.recipientEmail}:`, error);
           }
           // Anti-spam jitter: random delay 2-5 seconds between sends
           const jitter = 2000 + Math.random() * 3000;

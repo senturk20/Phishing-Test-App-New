@@ -1,4 +1,4 @@
-import { createTheme, type MantineColorsTuple } from '@mantine/core';
+import { createTheme, type MantineColorsTuple, type CSSVariablesResolver } from '@mantine/core';
 
 const cyberGreen: MantineColorsTuple = [
   '#e6fff2', '#b3ffd9', '#80ffc0', '#4dffa6', '#1aff8d',
@@ -14,6 +14,64 @@ const electricBlue: MantineColorsTuple = [
   '#e5f0ff', '#b3d4ff', '#80b8ff', '#4d9cff', '#1a80ff',
   '#0066e6', '#0052b3', '#003d80', '#00294d', '#00141a',
 ];
+
+// ============================================
+// CSS VARIABLES RESOLVER — Light / Dark tokens
+// ============================================
+
+export const cssVariablesResolver: CSSVariablesResolver = () => ({
+  variables: {},
+  light: {
+    // Shell
+    '--app-shell-bg': '#f0f2f5',
+    '--app-surface': '#ffffff',
+    '--app-border': '#dee2e6',
+    '--app-hover': '#f1f3f5',
+    // Text
+    '--app-text-primary': '#1a1a1a',
+    '--app-text-secondary': '#495057',
+    '--app-text-dimmed': '#868e96',
+    // Charts
+    '--app-chart-bg': '#ffffff',
+    '--app-chart-border': '#dee2e6',
+    '--app-chart-text': '#495057',
+    '--app-chart-tooltip-bg': '#ffffff',
+    '--app-chart-tooltip-color': '#1a1a1a',
+    // Progress bar track
+    '--app-track-bg': '#e9ecef',
+    // Nav
+    '--app-nav-active-text': '#ffffff',
+    '--app-nav-text': '#495057',
+    '--app-nav-section-text': '#868e96',
+  },
+  dark: {
+    // Shell
+    '--app-shell-bg': 'var(--mantine-color-dark-7)',
+    '--app-surface': 'var(--mantine-color-dark-6)',
+    '--app-border': 'var(--mantine-color-dark-4)',
+    '--app-hover': 'var(--mantine-color-dark-5)',
+    // Text
+    '--app-text-primary': '#ffffff',
+    '--app-text-secondary': '#C1C2C5',
+    '--app-text-dimmed': '#909296',
+    // Charts
+    '--app-chart-bg': '#25262B',
+    '--app-chart-border': '#373A40',
+    '--app-chart-text': '#A6A7AB',
+    '--app-chart-tooltip-bg': '#25262B',
+    '--app-chart-tooltip-color': '#ffffff',
+    // Progress bar track
+    '--app-track-bg': 'var(--mantine-color-dark-5)',
+    // Nav
+    '--app-nav-active-text': '#ffffff',
+    '--app-nav-text': 'var(--mantine-color-dark-1)',
+    '--app-nav-section-text': 'var(--mantine-color-dark-2)',
+  },
+});
+
+// ============================================
+// THEME
+// ============================================
 
 export const theme = createTheme({
   primaryColor: 'electricBlue',
@@ -42,15 +100,15 @@ export const theme = createTheme({
       defaultProps: { radius: 'lg', padding: 'lg', withBorder: true },
       styles: () => ({
         root: {
-          borderColor: 'var(--mantine-color-dark-4)',
-          backgroundColor: 'var(--mantine-color-dark-6)',
+          borderColor: 'var(--app-border)',
+          backgroundColor: 'var(--app-surface)',
         },
       }),
     },
     Table: {
       styles: () => ({
         th: {
-          color: 'var(--mantine-color-dark-1)',
+          color: 'var(--app-text-secondary)',
           fontWeight: 600,
           fontSize: '0.75rem',
           textTransform: 'uppercase' as const,

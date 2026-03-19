@@ -10,11 +10,12 @@ import {
   Tooltip,
   Burger,
   Box,
+  ActionIcon,
+  useMantineColorScheme,
 } from '@mantine/core';
 import {
   LayoutDashboard,
   Target,
-  PlusCircle,
   FileText,
   Mail,
   Shield,
@@ -25,17 +26,49 @@ import {
   ChevronRight,
   LogOut,
   User,
+  Users,
+  BarChart3,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { useSystemHealth } from '../hooks/useSystemHealth';
 import { useAuth } from '../contexts/AuthContext';
 
-const NAV_ITEMS = [
-  { to: '/', icon: LayoutDashboard, label: 'Dashboard', end: true },
-  { to: '/campaigns', icon: Target, label: 'Kampanyalar' },
-  { to: '/campaigns/new', icon: PlusCircle, label: 'Yeni Kampanya' },
-  { to: '/landing-pages', icon: FileText, label: 'Landing Pages' },
-  { to: '/email-templates', icon: Mail, label: 'E-posta Sablonlari' },
-  { to: '/file-manager', icon: Paperclip, label: 'Dosya Yonetimi' },
+interface NavItem {
+  to: string;
+  icon: typeof LayoutDashboard;
+  label: string;
+  end?: boolean;
+}
+
+interface NavGroup {
+  title: string;
+  items: NavItem[];
+}
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    title: 'OPERASYON',
+    items: [
+      { to: '/', icon: LayoutDashboard, label: 'Dashboard', end: true },
+      { to: '/campaigns', icon: Target, label: 'Kampanyalar' },
+    ],
+  },
+  {
+    title: 'KUTUPHANE',
+    items: [
+      { to: '/email-templates', icon: Mail, label: 'E-posta Sablonlari' },
+      { to: '/landing-pages', icon: FileText, label: 'Landing Pages' },
+      { to: '/file-manager', icon: Paperclip, label: 'Dosya Yonetimi' },
+    ],
+  },
+  {
+    title: 'HEDEF KITLE',
+    items: [
+      { to: '/users', icon: Users, label: 'Kullanicilar (LDAP)' },
+      { to: '/department-analysis', icon: BarChart3, label: 'Departman Analizi' },
+    ],
+  },
 ];
 
 const statusColor = (s: string) =>
@@ -48,41 +81,45 @@ export function Layout() {
   const [mobileOpened, setMobileOpened] = useState(false);
   const health = useSystemHealth();
   const { admin, logout } = useAuth();
+  const { colorScheme, toggleColorScheme } = useMantineColorScheme();
+  const isDark = colorScheme === 'dark';
 
-  const navLinks = NAV_ITEMS.map(({ to, icon: Icon, label, end }) => (
+  const renderNavItem = ({ to, icon: Icon, label, end }: NavItem) => (
     <NavLink
-      key={to}
+      key={to + label}
       to={to}
       end={end}
       onClick={() => setMobileOpened(false)}
       style={{ textDecoration: 'none' }}
     >
       {({ isActive }) => (
-        <UnstyledButton
-          px="md"
-          py="sm"
-          w="100%"
-          style={{
-            borderRadius: 'var(--mantine-radius-md)',
-            backgroundColor: isActive ? 'var(--mantine-color-electricBlue-4)' : 'transparent',
-            color: isActive ? '#fff' : 'var(--mantine-color-dark-1)',
-            transition: 'background-color 150ms ease',
-          }}
-          onMouseEnter={(e) => {
-            if (!isActive) e.currentTarget.style.backgroundColor = 'var(--mantine-color-dark-5)';
-          }}
-          onMouseLeave={(e) => {
-            if (!isActive) e.currentTarget.style.backgroundColor = 'transparent';
-          }}
-        >
-          <Group gap="sm" wrap="nowrap">
-            <Icon size={20} />
-            {!collapsed && <Text size="sm" fw={500}>{label}</Text>}
-          </Group>
-        </UnstyledButton>
+        <Tooltip label={label} position="right" disabled={!collapsed} withArrow>
+          <UnstyledButton
+            px="md"
+            py={8}
+            w="100%"
+            style={{
+              borderRadius: 'var(--mantine-radius-md)',
+              backgroundColor: isActive ? 'var(--mantine-color-electricBlue-4)' : 'transparent',
+              color: isActive ? 'var(--app-nav-active-text)' : 'var(--app-nav-text)',
+              transition: 'background-color 150ms ease',
+            }}
+            onMouseEnter={(e) => {
+              if (!isActive) e.currentTarget.style.backgroundColor = 'var(--app-hover)';
+            }}
+            onMouseLeave={(e) => {
+              if (!isActive) e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            <Group gap="sm" wrap="nowrap">
+              <Icon size={18} />
+              {!collapsed && <Text size="sm" fw={500}>{label}</Text>}
+            </Group>
+          </UnstyledButton>
+        </Tooltip>
       )}
     </NavLink>
-  ));
+  );
 
   return (
     <AppShell
@@ -94,14 +131,14 @@ export function Layout() {
       }}
       padding="lg"
       styles={{
-        main: { backgroundColor: 'var(--mantine-color-dark-7)' },
+        main: { backgroundColor: 'var(--app-shell-bg)' },
         header: {
-          backgroundColor: 'var(--mantine-color-dark-6)',
-          borderBottom: '1px solid var(--mantine-color-dark-4)',
+          backgroundColor: 'var(--app-surface)',
+          borderBottom: '1px solid var(--app-border)',
         },
         navbar: {
-          backgroundColor: 'var(--mantine-color-dark-6)',
-          borderRight: '1px solid var(--mantine-color-dark-4)',
+          backgroundColor: 'var(--app-surface)',
+          borderRight: '1px solid var(--app-border)',
         },
       }}
     >
@@ -114,7 +151,7 @@ export function Layout() {
               onClick={() => setMobileOpened(!mobileOpened)}
               hiddenFrom="sm"
               size="sm"
-              color="var(--mantine-color-dark-1)"
+              color="var(--app-text-secondary)"
             />
             <Shield size={24} color="var(--mantine-color-electricBlue-4)" />
             <Text fw={700} size="lg" c="white">
@@ -123,6 +160,20 @@ export function Layout() {
           </Group>
 
           <Group gap="md">
+            {/* Theme Toggle */}
+            <Tooltip label={isDark ? 'Acik Tema' : 'Koyu Tema'}>
+              <ActionIcon
+                variant="subtle"
+                color={isDark ? 'yellow' : 'electricBlue'}
+                size="lg"
+                radius="md"
+                onClick={() => toggleColorScheme()}
+                aria-label="Tema Degistir"
+              >
+                {isDark ? <Sun size={18} /> : <Moon size={18} />}
+              </ActionIcon>
+            </Tooltip>
+
             <Tooltip label={`Veritabani: ${statusLabel(health.database)}`}>
               <Badge
                 leftSection={<Database size={12} />}
@@ -145,7 +196,7 @@ export function Layout() {
             </Tooltip>
             {admin && (
               <Group gap={6}>
-                <User size={14} color="var(--mantine-color-dark-2)" />
+                <User size={14} color="var(--app-text-dimmed)" />
                 <Text size="sm" c="dimmed" fw={500}>
                   {admin.username}
                 </Text>
@@ -158,13 +209,38 @@ export function Layout() {
       {/* Sidebar */}
       <AppShell.Navbar p="sm">
         <AppShell.Section grow>
-          <Stack gap={4}>
-            {navLinks}
+          <Stack gap={2}>
+            {NAV_GROUPS.map((group, gi) => (
+              <Box key={group.title}>
+                {gi > 0 && (
+                  <Box
+                    my={8}
+                    style={{ borderTop: '1px solid var(--app-border)' }}
+                  />
+                )}
+                {!collapsed && (
+                  <Text
+                    size="10px"
+                    fw={700}
+                    tt="uppercase"
+                    px="md"
+                    mb={4}
+                    mt={gi === 0 ? 0 : 4}
+                    style={{ letterSpacing: '0.08em', color: 'var(--app-nav-section-text)' }}
+                  >
+                    {group.title}
+                  </Text>
+                )}
+                <Stack gap={2}>
+                  {group.items.map(renderNavItem)}
+                </Stack>
+              </Box>
+            ))}
           </Stack>
         </AppShell.Section>
 
         <AppShell.Section>
-          <Box pt="sm" style={{ borderTop: '1px solid var(--mantine-color-dark-4)' }}>
+          <Box pt="sm" style={{ borderTop: '1px solid var(--app-border)' }}>
             <Tooltip label="Cikis Yap" position="right" disabled={!collapsed}>
               <UnstyledButton
                 w="100%"
@@ -177,7 +253,7 @@ export function Layout() {
                   color: 'var(--mantine-color-red-4)',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--mantine-color-dark-5)';
+                  e.currentTarget.style.backgroundColor = 'var(--app-hover)';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = 'transparent';
@@ -196,7 +272,7 @@ export function Layout() {
               onClick={() => setCollapsed(!collapsed)}
               style={{
                 borderRadius: 'var(--mantine-radius-md)',
-                color: 'var(--mantine-color-dark-2)',
+                color: 'var(--app-text-dimmed)',
               }}
             >
               <Group gap="sm" justify={collapsed ? 'center' : 'flex-start'}>

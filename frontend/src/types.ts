@@ -156,9 +156,15 @@ export interface LdapFaculty {
 export interface DepartmentStat {
   faculty: string;
   totalRecipients: number;
+  totalSent: number;
+  totalOpened: number;
   totalClicked: number;
   totalSubmitted: number;
+  totalFileDownloads: number;
+  openRate: number;
+  clickRate: number;
   submissionRate: number;
+  fileDownloadRate: number;
 }
 
 export interface LdapSyncResult {
