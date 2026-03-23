@@ -1,6 +1,9 @@
 import nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
 import { config } from '../config.js';
+import { createLogger } from '../utils/logger.js';
+
+const log = createLogger('MailService');
 
 // ============================================
 // SMTP TRANSPORTER
@@ -44,11 +47,7 @@ export async function sendEmail(params: SendEmailParams): Promise<boolean> {
 
   // Memory mode — just log, don't actually send
   if (config.useMemoryDb) {
-    console.log('========================================');
-    console.log('[MailService - MemoryMode] Email logged:');
-    console.log(`  To:      ${to}`);
-    console.log(`  Subject: ${subject}`);
-    console.log('========================================');
+    log.info('MemoryMode email logged', { to, subject });
     return true;
   }
 
@@ -60,10 +59,10 @@ export async function sendEmail(params: SendEmailParams): Promise<boolean> {
       subject,
       html,
     });
-    console.log(`Email sent to ${to}`);
+    log.info('Email sent', { to });
     return true;
   } catch (error) {
-    console.error(`Failed to send email to ${to}:`, error);
+    log.error('Failed to send email', { to, error: String(error) });
     return false;
   }
 }

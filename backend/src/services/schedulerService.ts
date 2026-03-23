@@ -2,6 +2,9 @@ import type { Campaign } from '../types/index.js';
 import { config } from '../config.js';
 import { getPool, memoryStore } from '../db/index.js';
 import { completeCampaign } from './campaignService.js';
+import { createLogger } from '../utils/logger.js';
+
+const log = createLogger('Scheduler');
 
 // ============================================
 // DAY MAPPING
@@ -17,7 +20,21 @@ const DAY_NAMES = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 // TIME HELPERS
 // ============================================
 
+/** Check whether a Date object holds a valid timestamp. */
+function isValidDate(d: Date): boolean {
+  return d instanceof Date && !isNaN(d.getTime());
+}
+
+/** Safely format a Date — returns ISO string or a fallback label. */
+function safeISO(d: Date): string {
+  return isValidDate(d) ? d.toISOString() : '[Invalid Date]';
+}
+
 function parseTime(timeStr: string): { hours: number; minutes: number } {
+  if (!timeStr || !/^\d{1,2}:\d{2}$/.test(timeStr.trim())) {
+    log.warn(`Invalid time string "${timeStr}", defaulting to 09:00`);
+    return { hours: 9, minutes: 0 };
+  }
   const [h, m] = timeStr.split(':').map(Number);
   return { hours: h || 0, minutes: m || 0 };
 }
@@ -123,14 +140,22 @@ export function calculateNextSendTime(
   currentIndex: number,
   totalRecipients: number,
 ): Date {
-  // Base start time
+  // ── Base start time (with validation) ──
   const now = new Date();
   let baseTime: Date;
 
   if (settings.startDate && settings.startTime) {
     const start = parseTime(settings.startTime);
     baseTime = new Date(`${settings.startDate}T00:00:00`);
-    baseTime = setTime(baseTime, start.hours, start.minutes);
+
+    // Guard: if startDate produced an invalid Date, fall back to now
+    if (!isValidDate(baseTime)) {
+      log.warn(`Invalid startDate "${settings.startDate}" — falling back to current time`);
+      baseTime = new Date();
+    } else {
+      baseTime = setTime(baseTime, start.hours, start.minutes);
+    }
+
     // If configured start is in the past, use now
     if (baseTime < now) {
       baseTime = now;
@@ -144,26 +169,37 @@ export function calculateNextSendTime(
     return baseTime;
   }
 
-  // Calculate work minutes per day
-  const bhStart = parseTime(settings.businessHoursStart);
-  const bhEnd = parseTime(settings.businessHoursEnd);
+  // ── Spread math (with zero / NaN guards) ──
+  const bhStart = parseTime(settings.businessHoursStart || '09:00');
+  const bhEnd = parseTime(settings.businessHoursEnd || '17:00');
   const workMinutesPerDay = (bhEnd.hours * 60 + bhEnd.minutes) - (bhStart.hours * 60 + bhStart.minutes);
 
   if (workMinutesPerDay <= 0 || totalRecipients <= 0) {
+    log.warn('Invalid spread params, returning baseTime', { workMinutesPerDay, totalRecipients });
     return baseTime;
   }
+
+  // Sanitise spreadDays: must be a positive number, default to 1
+  const spreadValue = Number(settings.spreadDays) || 1;
 
   // Total work minutes in the spread window
   let totalWorkMinutes: number;
   if (settings.spreadUnit === 'hours') {
-    totalWorkMinutes = settings.spreadDays * 60; // spreadDays is actually hours here
+    totalWorkMinutes = spreadValue * 60; // spreadDays is actually hours here
   } else {
     // 'days' — number of business days
-    totalWorkMinutes = workMinutesPerDay * settings.spreadDays;
+    totalWorkMinutes = workMinutesPerDay * spreadValue;
   }
 
   // Interval between each email (in minutes)
   const intervalMinutes = totalWorkMinutes / totalRecipients;
+
+  log.debug('Interval calculated', {
+    intervalMinutes: intervalMinutes.toFixed(2),
+    totalWorkMinutes,
+    totalRecipients,
+    spread: `${spreadValue} ${settings.spreadUnit || 'days'}`,
+  });
 
   // Offset for this specific recipient
   const offsetMinutes = intervalMinutes * currentIndex;
@@ -216,20 +252,45 @@ export function calculateSendDelays(
   campaign: Campaign,
   totalRecipients: number,
 ): number[] {
+  if (!totalRecipients || totalRecipients <= 0) {
+    log.warn('calculateSendDelays called with 0 recipients — returning []');
+    return [];
+  }
+
+  log.info('Calculating delays', {
+    campaign: campaign.name,
+    totalRecipients,
+    mode: campaign.sendingMode,
+    startDate: campaign.startDate ?? 'none',
+    startTime: campaign.startTime ?? 'none',
+    spread: `${campaign.spreadDays} ${campaign.spreadUnit}`,
+  });
+
   const now = Date.now();
   const delays: number[] = [];
 
   for (let i = 0; i < totalRecipients; i++) {
     const sendTime = calculateNextSendTime(campaign, i, totalRecipients);
-    const delayMs = Math.max(0, sendTime.getTime() - now);
+
+    // Guard: if sendTime is somehow invalid, use delay 0 (send now)
+    const delayMs = isValidDate(sendTime)
+      ? Math.max(0, sendTime.getTime() - now)
+      : 0;
+
+    if (!isValidDate(sendTime)) {
+      log.warn(`Invalid sendTime for email ${i + 1}/${totalRecipients} — sending immediately`);
+    }
+
     delays.push(delayMs);
 
     // Log the first, last, and every 50th recipient for verification
     if (i === 0 || i === totalRecipients - 1 || i % 50 === 0) {
-      console.log(
-        `[Scheduler] Campaign "${campaign.name}" — email ${i + 1}/${totalRecipients} ` +
-        `scheduled for: ${sendTime.toISOString()} (delay: ${Math.round(delayMs / 1000)}s)`
-      );
+      log.debug('Email scheduled', {
+        campaign: campaign.name,
+        index: `${i + 1}/${totalRecipients}`,
+        scheduledFor: safeISO(sendTime),
+        delaySec: Math.round(delayMs / 1000),
+      });
     }
   }
 
@@ -271,17 +332,13 @@ async function checkCampaignCompletions(): Promise<void> {
         const expiryDate = new Date(lastSentAt.getTime() + trackDays * 24 * 60 * 60 * 1000);
 
         if (now >= expiryDate) {
-          console.log(
-            `[Scheduler] Campaign "${campaign.name}" — activity tracking period expired ` +
-            `(last sent: ${lastSentAt.toISOString()}, track: ${trackDays}d). Auto-completing.`
-          );
+          log.info('Campaign activity tracking expired — auto-completing', {
+            campaign: campaign.name, lastSent: lastSentAt.toISOString(), trackDays,
+          });
           await completeCampaign(campaign.id);
         } else {
           const remainingHours = Math.round((expiryDate.getTime() - now.getTime()) / 3600000);
-          console.log(
-            `[Scheduler] Campaign "${campaign.name}" — tracking active, ` +
-            `${remainingHours}h remaining until auto-complete`
-          );
+          log.debug('Campaign tracking active', { campaign: campaign.name, remainingHours });
         }
       }
       return;
@@ -314,21 +371,17 @@ async function checkCampaignCompletions(): Promise<void> {
       const expiryDate = new Date(lastSentAt.getTime() + trackDays * 24 * 60 * 60 * 1000);
 
       if (now >= expiryDate) {
-        console.log(
-          `[Scheduler] Campaign "${row.name}" (${row.id}) — activity tracking period expired ` +
-          `(last sent: ${lastSentAt.toISOString()}, track: ${trackDays}d). Auto-completing.`
-        );
+        log.info('Campaign activity tracking expired — auto-completing', {
+          campaign: row.name, id: row.id, lastSent: lastSentAt.toISOString(), trackDays,
+        });
         await completeCampaign(row.id);
       } else {
         const remainingHours = Math.round((expiryDate.getTime() - now.getTime()) / 3600000);
-        console.log(
-          `[Scheduler] Campaign "${row.name}" — tracking active, ` +
-          `${remainingHours}h remaining until auto-complete`
-        );
+        log.debug('Campaign tracking active', { campaign: row.name, remainingHours });
       }
     }
   } catch (err) {
-    console.error('[Scheduler] Error checking campaign completions:', err);
+    log.error('Error checking campaign completions', { error: err instanceof Error ? err.message : String(err) });
   }
 }
 
@@ -338,7 +391,7 @@ async function checkCampaignCompletions(): Promise<void> {
 export function startCompletionChecker(): void {
   if (completionTimer) return;
 
-  console.log('[Scheduler] Campaign completion checker started (interval: 60s)');
+  log.info('Campaign completion checker started (interval: 60s)');
   // Run immediately on start, then every 60s
   checkCampaignCompletions();
   completionTimer = setInterval(checkCampaignCompletions, 60_000);
@@ -348,6 +401,6 @@ export function stopCompletionChecker(): void {
   if (completionTimer) {
     clearInterval(completionTimer);
     completionTimer = null;
-    console.log('[Scheduler] Campaign completion checker stopped');
+    log.info('Campaign completion checker stopped');
   }
 }

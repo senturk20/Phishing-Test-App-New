@@ -1,6 +1,9 @@
 import { config } from '../config.js';
 import { getPool, memoryStore, generateId, generateToken } from '../db/index.js';
 import type { Recipient, RecipientStatus } from '../types/index.js';
+import { createLogger } from '../utils/logger.js';
+
+const log = createLogger('RecipientService');
 
 // ============================================
 // GET RECIPIENTS BY CAMPAIGN
@@ -71,7 +74,7 @@ export async function createRecipient(data: {
       updatedAt: now,
     };
     memoryStore.recipients.push(recipient);
-    console.log(`Recipient created: ${recipient.email}`);
+    log.info('Recipient created', { email: recipient.email });
     return recipient;
   }
 
@@ -87,7 +90,7 @@ export async function createRecipient(data: {
   );
 
   const row = result.rows[0];
-  console.log(`Recipient created: ${row.email}`);
+  log.info('Recipient created', { email: row.email });
 
   return {
     id: row.id,
@@ -134,7 +137,7 @@ export async function createRecipientsBulk(
         updatedAt: now,
       });
     }
-    console.log(`${recipients.length} recipients created for campaign ${campaignId}`);
+    log.info('Recipients created in bulk', { count: recipients.length, campaignId });
     return recipients.length;
   }
 
@@ -152,7 +155,7 @@ export async function createRecipientsBulk(
       );
     }
     await client.query('COMMIT');
-    console.log(`${recipients.length} recipients created for campaign ${campaignId}`);
+    log.info('Recipients created in bulk', { count: recipients.length, campaignId });
     return recipients.length;
   } catch (error) {
     await client.query('ROLLBACK');

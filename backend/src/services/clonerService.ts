@@ -17,6 +17,9 @@ import path from 'path';
 import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
+import { createLogger } from '../utils/logger.js';
+
+const log = createLogger('Mirror');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -78,7 +81,7 @@ async function fetchAsset(url: string, destDir: string): Promise<string | null> 
       signal: AbortSignal.timeout(15000),
     });
     if (!response.ok) {
-      console.log(`[Mirror] Skip ${url} — HTTP ${response.status}`);
+      log.debug(`Skip ${url} — HTTP ${response.status}`);
       return null;
     }
     const buffer = Buffer.from(await response.arrayBuffer());
@@ -86,7 +89,7 @@ async function fetchAsset(url: string, destDir: string): Promise<string | null> 
     await fs.writeFile(path.join(destDir, filename), buffer);
     return filename;
   } catch (err) {
-    console.log(`[Mirror] Skip ${url} — ${err instanceof Error ? err.message : 'error'}`);
+    log.debug(`Skip ${url}`, { error: err instanceof Error ? err.message : 'error' });
     return null;
   }
 }
@@ -246,7 +249,7 @@ export async function mirrorSite(url: string, pageId: string): Promise<MirrorRes
   const cloneDir = path.join(CLONES_DIR, pageId);
   await fs.mkdir(cloneDir, { recursive: true });
 
-  console.log(`[Mirror] Fetching: ${url}`);
+  log.info(`Fetching: ${url}`);
 
   const response = await fetch(url, {
     headers: {
@@ -275,7 +278,7 @@ export async function mirrorSite(url: string, pageId: string): Promise<MirrorRes
   const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/is);
   const title = titleMatch ? titleMatch[1].trim().replace(/\s+/g, ' ') : parsedUrl.hostname;
 
-  console.log(`[Mirror] Raw HTML: ${html.length} bytes, title: "${title}"`);
+  log.info('Raw HTML received', { bytes: html.length, title });
 
   // Step 1: Strip security meta tags
   html = stripSecurityMeta(html);
@@ -287,7 +290,7 @@ export async function mirrorSite(url: string, pageId: string): Promise<MirrorRes
 
   // Step 3: Discover all asset URLs
   const assetUrls = extractAssetUrls(html, baseUrl);
-  console.log(`[Mirror] Found ${assetUrls.size} asset URLs to download`);
+  log.info('Asset URLs discovered', { count: assetUrls.size });
 
   // Step 4: Download all assets in parallel (with concurrency limit)
   const localPrefix = `/static/clones/${pageId}`;
@@ -313,7 +316,7 @@ export async function mirrorSite(url: string, pageId: string): Promise<MirrorRes
     }
   }
 
-  console.log(`[Mirror] Downloaded ${downloadCount}/${assetUrls.size} assets`);
+  log.info('Assets downloaded', { downloaded: downloadCount, total: assetUrls.size });
 
   // Step 5: For downloaded CSS files, also download their internal url() references
   const cssFiles = entries.filter(([absUrl]) => {
@@ -394,7 +397,7 @@ export async function mirrorSite(url: string, pageId: string): Promise<MirrorRes
   // Step 9: Save the final HTML as index.html in the clone folder
   await fs.writeFile(path.join(cloneDir, 'index.html'), html, 'utf-8');
 
-  console.log(`[Mirror] Complete: ${title} — ${downloadCount} assets, saved to ${cloneDir}`);
+  log.info('Clone complete', { title, assetCount: downloadCount, cloneDir });
 
   return {
     staticPath: `clones/${pageId}`,
@@ -413,7 +416,7 @@ export async function deleteCloneFolder(pageId: string): Promise<void> {
   const cloneDir = path.join(CLONES_DIR, pageId);
   try {
     await fs.rm(cloneDir, { recursive: true, force: true });
-    console.log(`[Mirror] Deleted clone folder: ${cloneDir}`);
+    log.info('Deleted clone folder', { cloneDir });
   } catch {
     // Non-fatal — folder may not exist
   }

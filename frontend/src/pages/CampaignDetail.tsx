@@ -98,7 +98,7 @@ export function CampaignDetail() {
       const data = await api.getRecipients(id);
       setRecipients(data);
     } catch {
-      console.error('Failed to fetch recipients');
+      // Recipient fetch failed — non-critical, UI shows empty list
     }
   };
 

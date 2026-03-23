@@ -8,6 +8,9 @@ import { isRedisAvailable, enqueueEmailBatch, enqueueEmailWithDelay } from './qu
 import type { EmailJobData } from './queueService.js';
 import { calculateSendDelays } from './schedulerService.js';
 import pLimit from 'p-limit';
+import { createLogger } from '../utils/logger.js';
+
+const log = createLogger('CampaignService');
 
 // ============================================
 // PLACEHOLDER HELPER
@@ -25,7 +28,7 @@ function replacePlaceholders(
   // Resolve the effective download URL
   const dlUrl = downloadLink || '';
 
-  console.log(`[replacePlaceholders] recipient=${recipient.email}, downloadLink=${dlUrl || '(none)'}, trackingLink=${trackingLink}`);
+  log.debug('replacePlaceholders', { recipient: recipient.email, downloadLink: dlUrl || '(none)', trackingLink });
 
   // Build styled download button HTML.
   // Uses simple, email-client-safe inline styles (no shorthand, no quotes in font-family).
@@ -54,10 +57,7 @@ function replacePlaceholders(
 
   // Warn if template uses download placeholders but no download URL was provided
   if (!dlUrl && (text.includes('{{downloadLink}}') || text.includes('{{downloadButton}}'))) {
-    console.warn(
-      `[replacePlaceholders] WARNING: Template uses {{downloadLink}}/{{downloadButton}} ` +
-      `but no attachmentId on campaign. Recipient: ${recipient.email}`
-    );
+    log.warn('Template uses downloadLink/downloadButton but no attachmentId on campaign', { recipient: recipient.email });
   }
 
   return text
@@ -279,7 +279,7 @@ export async function createCampaign(data: {
       updatedAt: now,
     };
     memoryStore.campaigns.push(campaign);
-    console.log(`Campaign created: ${campaign.name}`);
+    log.info('Campaign created', { name: campaign.name });
     return campaign;
   }
 
@@ -321,7 +321,7 @@ export async function createCampaign(data: {
   );
 
   const row = result.rows[0];
-  console.log(`Campaign created: ${row.name}`);
+  log.info('Campaign created', { name: row.name });
 
   return {
     id: row.id,
@@ -372,7 +372,7 @@ export async function updateCampaign(
     if (data.description !== undefined) campaign.description = data.description;
     if (data.targetCount !== undefined) campaign.targetCount = data.targetCount;
     campaign.updatedAt = new Date();
-    console.log(`Campaign updated: ${campaign.name}`);
+    log.info('Campaign updated', { name: campaign.name });
     return campaign;
   }
 
@@ -411,7 +411,7 @@ export async function updateCampaign(
   if (result.rows.length === 0) return null;
 
   const row = result.rows[0];
-  console.log(`Campaign updated: ${row.name}`);
+  log.info('Campaign updated', { name: row.name });
 
   return {
     id: row.id,
@@ -457,7 +457,7 @@ export async function deleteCampaign(id: string): Promise<boolean> {
     memoryStore.events = memoryStore.events.filter((e) => e.campaignId !== id);
     memoryStore.recipients = memoryStore.recipients.filter((r) => r.campaignId !== id);
     memoryStore.campaigns.splice(index, 1);
-    console.log(`Campaign deleted: ${id}`);
+    log.info('Campaign deleted', { id });
     return true;
   }
 
@@ -470,7 +470,7 @@ export async function deleteCampaign(id: string): Promise<boolean> {
   const result = await p.query('DELETE FROM campaigns WHERE id = $1 RETURNING id', [id]);
   if (result.rows.length === 0) return false;
 
-  console.log(`Campaign deleted: ${id}`);
+  log.info('Campaign deleted', { id });
   return true;
 }
 
@@ -537,7 +537,7 @@ export async function startCampaign(id: string): Promise<Campaign | null> {
 
   if (!campaign) return null;
 
-  console.log(`Campaign started: ${campaign.name}`);
+  log.info('Campaign started', { name: campaign.name });
 
   // --- Resolve email template ---
   let templateSubject = 'Acil: Şifrenizi Güncellemeniz Gerekmektedir';
@@ -570,11 +570,14 @@ export async function startCampaign(id: string): Promise<Campaign | null> {
   const hasAttachment = !!campaign.attachmentId;
   const isSpread = campaign.sendingMode === 'spread';
 
-  console.log(
-    `[Campaign Send] id=${campaign.id}, name=${campaign.name}, ` +
-    `attachmentId=${campaign.attachmentId || 'NULL'}, hasAttachment=${hasAttachment}, ` +
-    `mode=${campaign.sendingMode}, spread=${campaign.spreadDays}${campaign.spreadUnit === 'hours' ? 'h' : 'd'}`
-  );
+  log.info('Campaign send initiated', {
+    id: campaign.id,
+    name: campaign.name,
+    attachmentId: campaign.attachmentId || 'NULL',
+    hasAttachment,
+    mode: campaign.sendingMode,
+    spread: `${campaign.spreadDays}${campaign.spreadUnit === 'hours' ? 'h' : 'd'}`,
+  });
 
   // Pre-calculate per-recipient delays if spread mode is active
   const delays = isSpread
@@ -609,21 +612,19 @@ export async function startCampaign(id: string): Promise<Campaign | null> {
       }));
       await enqueueEmailWithDelay(delayedJobs);
       const lastDelayMin = Math.round((delays[delays.length - 1] || 0) / 60000);
-      console.log(
-        `[Scheduler] Campaign "${campaign.name}": ${jobDataList.length} emails enqueued with spread delays ` +
-        `(last email in ~${lastDelayMin} minutes)`
-      );
+      log.info('Emails enqueued with spread delays', {
+        campaign: campaign.name,
+        count: jobDataList.length,
+        lastDelayMin,
+      });
     } else {
       // --- Queue + All: enqueue all immediately ---
       await enqueueEmailBatch(jobDataList);
-      console.log(`Campaign "${campaign.name}": ${jobDataList.length} emails enqueued (immediate)`);
+      log.info('Emails enqueued immediately', { campaign: campaign.name, count: jobDataList.length });
     }
   } else {
     // --- Direct mode: Redis unavailable, non-blocking fallback ---
-    console.warn(
-      `[Campaign] Redis is DOWN — sending ${recipients.length} emails in direct mode. ` +
-      `This is a fallback; ensure Redis is running for production use.`
-    );
+    log.warn('Redis is DOWN — sending emails in direct mode', { count: recipients.length });
 
     const campaignName = campaign.name;
     const totalRecipients = recipients.length;
@@ -639,10 +640,12 @@ export async function startCampaign(id: string): Promise<Campaign | null> {
             // In spread mode, wait the calculated delay before sending
             const delayMs = delays[index];
             if (delayMs > 0) {
-              console.log(
-                `[Scheduler] Direct mode — waiting ${Math.round(delayMs / 1000)}s ` +
-                `for email ${index + 1}/${totalRecipients} to ${jobData.recipientEmail}`
-              );
+              log.debug('Direct mode — waiting before send', {
+                delaySec: Math.round(delayMs / 1000),
+                emailIndex: index + 1,
+                totalRecipients,
+                to: jobData.recipientEmail,
+              });
               await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
             }
 
@@ -656,7 +659,7 @@ export async function startCampaign(id: string): Promise<Campaign | null> {
               sentCount++;
             }
           } catch (error) {
-            console.error(`Failed to send email to ${jobData.recipientEmail}:`, error);
+            log.error('Failed to send email', { to: jobData.recipientEmail, error: String(error) });
           }
           // Anti-spam jitter: random delay 2-5 seconds between sends
           const jitter = 2000 + Math.random() * 3000;
@@ -665,10 +668,10 @@ export async function startCampaign(id: string): Promise<Campaign | null> {
       );
 
       await Promise.allSettled(tasks);
-      console.log(`Campaign "${campaignName}": ${sentCount}/${totalRecipients} emails sent (direct mode)`);
+      log.info('Direct mode sending complete', { campaign: campaignName, sent: sentCount, total: totalRecipients });
     });
 
-    console.log(`Campaign "${campaign.name}": ${recipients.length} emails dispatched in background (direct mode)`);
+    log.info('Emails dispatched in background (direct mode)', { campaign: campaign.name, count: recipients.length });
   }
 
   return campaign;
@@ -684,7 +687,7 @@ export async function pauseCampaign(id: string): Promise<Campaign | null> {
     if (campaign && campaign.status === 'active') {
       campaign.status = 'paused';
       campaign.updatedAt = new Date();
-      console.log(`Campaign paused: ${campaign.name}`);
+      log.info('Campaign paused', { name: campaign.name });
       return campaign;
     }
     return null;
@@ -703,7 +706,7 @@ export async function pauseCampaign(id: string): Promise<Campaign | null> {
   if (result.rows.length === 0) return null;
 
   const row = result.rows[0];
-  console.log(`Campaign paused: ${row.name}`);
+  log.info('Campaign paused', { name: row.name });
 
   return {
     id: row.id,
@@ -747,7 +750,7 @@ export async function resumeCampaign(id: string): Promise<Campaign | null> {
     if (campaign && campaign.status === 'paused') {
       campaign.status = 'active';
       campaign.updatedAt = new Date();
-      console.log(`Campaign resumed: ${campaign.name}`);
+      log.info('Campaign resumed', { name: campaign.name });
       return campaign;
     }
     return null;
@@ -766,7 +769,7 @@ export async function resumeCampaign(id: string): Promise<Campaign | null> {
   if (result.rows.length === 0) return null;
 
   const row = result.rows[0];
-  console.log(`Campaign resumed: ${row.name}`);
+  log.info('Campaign resumed', { name: row.name });
 
   return {
     id: row.id,
@@ -810,7 +813,7 @@ export async function completeCampaign(id: string): Promise<Campaign | null> {
     if (campaign && (campaign.status === 'active' || campaign.status === 'paused')) {
       campaign.status = 'completed';
       campaign.updatedAt = new Date();
-      console.log(`Campaign completed: ${campaign.name}`);
+      log.info('Campaign completed', { name: campaign.name });
       return campaign;
     }
     return null;
@@ -829,7 +832,7 @@ export async function completeCampaign(id: string): Promise<Campaign | null> {
   if (result.rows.length === 0) return null;
 
   const row = result.rows[0];
-  console.log(`Campaign completed: ${row.name}`);
+  log.info('Campaign completed', { name: row.name });
 
   return {
     id: row.id,

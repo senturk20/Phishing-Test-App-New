@@ -4,11 +4,14 @@ import { fileURLToPath } from 'url';
 import fs from 'fs/promises';
 import {
   getRecipientByToken,
-  updateRecipientStatus,
   getCampaign,
   getLandingPage,
-  insertEvent,
 } from '../services/index.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { trackEvent } from '../utils/eventLogger.js';
+import { createLogger } from '../utils/logger.js';
+
+const log = createLogger('Tracking');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,114 +23,87 @@ const router = Router();
 // ============================================
 // GET /t/:token — Click tracking + Landing Page
 // ============================================
-// When a recipient clicks the phishing link in the email,
-// this endpoint:
-//   1. Logs the "clicked" event
-//   2. Updates the recipient status
-//   3. Serves the campaign's landing page HTML
-//
-// For CLONED pages, we read from disk (not DB) because:
-//   - The on-disk HTML has correct asset paths after the rename
-//   - We inject a <base> tag dynamically so relative CSS/JS/images resolve
-//   - Form actions use ABSOLUTE paths (/p/:token) so <base> doesn't break them
-//   - We replace the __TOKEN__ placeholder with the real recipient token
 
-router.get('/:token', async (req: Request, res: Response) => {
+router.get('/:token', asyncHandler(async (req: Request, res: Response) => {
   const { token } = req.params;
 
-  try {
-    // 1. Look up recipient by token
-    const recipient = await getRecipientByToken(token);
-    if (!recipient) {
-      res.status(404).send('<h1>Sayfa bulunamadi</h1>');
-      return;
-    }
+  // 1. Look up recipient by token
+  const recipient = await getRecipientByToken(token);
+  if (!recipient) {
+    res.status(404).send('<h1>Sayfa bulunamadi</h1>');
+    return;
+  }
 
-    // 2. Look up campaign
-    const campaign = await getCampaign(recipient.campaignId);
-    if (!campaign) {
-      res.status(404).send('<h1>Sayfa bulunamadi</h1>');
-      return;
-    }
+  // 2. Look up campaign
+  const campaign = await getCampaign(recipient.campaignId);
+  if (!campaign) {
+    res.status(404).send('<h1>Sayfa bulunamadi</h1>');
+    return;
+  }
 
-    // 3. Log "clicked" event
-    const ipAddress = req.ip || req.socket.remoteAddress;
-    const userAgent = req.get('User-Agent');
-    await insertEvent('clicked', campaign.id, token, ipAddress, userAgent);
+  // 3. Log "clicked" event + update status
+  await trackEvent({
+    type: 'clicked',
+    campaignId: campaign.id,
+    token,
+    req,
+    updateStatus: true,
+  });
 
-    // 4. Update recipient status to "clicked" (only if currently "sent")
-    if (recipient.status === 'sent') {
-      await updateRecipientStatus(token, 'clicked');
-    }
+  log.info('Click recorded', { token, campaignId: campaign.id });
 
-    console.log(`[Tracking] Click recorded: token=${token}, campaign=${campaign.id}`);
+  // 4. Resolve landing page HTML
+  let landingHtml: string | null = null;
 
-    // 5. Resolve landing page HTML
-    let landingHtml: string | null = null;
+  if (campaign.landingPageId) {
+    const landingPage = await getLandingPage(campaign.landingPageId);
 
-    if (campaign.landingPageId) {
-      const landingPage = await getLandingPage(campaign.landingPageId);
-
-      if (landingPage && landingPage.isCloned) {
-        // ── CLONED PAGE: read from disk (authoritative source) ──
-        const cloneIndexPath = path.join(CLONES_DIR, landingPage.id, 'index.html');
-        try {
-          landingHtml = await fs.readFile(cloneIndexPath, 'utf-8');
-        } catch {
-          // Disk file missing — fall back to DB HTML
-          landingHtml = landingPage.html;
-        }
-
-        if (landingHtml) {
-          // Ensure a <base> tag exists so relative asset URLs resolve correctly.
-          // The cloner may have already injected one; if not, add it.
-          const baseHref = `/static/clones/${landingPage.id}/`;
-          if (!landingHtml.includes('<base ')) {
-            if (/<head[^>]*>/i.test(landingHtml)) {
-              landingHtml = landingHtml.replace(/<head[^>]*>/i, (m) => m + `\n    <base href="${baseHref}">`);
-            } else {
-              landingHtml = `<base href="${baseHref}">\n` + landingHtml;
-            }
-          }
-
-          // Migrate legacy clones: /api/p/ → /p/ (clones created before the route fix)
-          landingHtml = landingHtml.split('/api/p/').join('/p/');
-
-          // Replace __TOKEN__ placeholder with the real recipient token
-          landingHtml = landingHtml.split('__TOKEN__').join(encodeURIComponent(token));
-        }
-      } else if (landingPage) {
-        // ── MANUAL PAGE: use DB HTML directly ──
+    if (landingPage && landingPage.isCloned) {
+      // ── CLONED PAGE: read from disk (authoritative source) ──
+      const cloneIndexPath = path.join(CLONES_DIR, landingPage.id, 'index.html');
+      try {
+        landingHtml = await fs.readFile(cloneIndexPath, 'utf-8');
+      } catch {
         landingHtml = landingPage.html;
       }
+
+      if (landingHtml) {
+        const baseHref = `/static/clones/${landingPage.id}/`;
+        if (!landingHtml.includes('<base ')) {
+          if (/<head[^>]*>/i.test(landingHtml)) {
+            landingHtml = landingHtml.replace(/<head[^>]*>/i, (m) => m + `\n    <base href="${baseHref}">`);
+          } else {
+            landingHtml = `<base href="${baseHref}">\n` + landingHtml;
+          }
+        }
+
+        landingHtml = landingHtml.split('/api/p/').join('/p/');
+        landingHtml = landingHtml.split('__TOKEN__').join(encodeURIComponent(token));
+      }
+    } else if (landingPage) {
+      landingHtml = landingPage.html;
     }
-
-    // 6. If no landing page set, serve default educational page
-    if (!landingHtml) {
-      landingHtml = getDefaultLandingPage();
-    }
-
-    // 7. Inject tracking data so the hook script can read token/campaignId.
-    //    Uses history.replaceState to add query params without a reload.
-    const injectionScript = `<script>history.replaceState(null,'',window.location.pathname+'?token=${encodeURIComponent(token)}&campaign=${encodeURIComponent(campaign.id)}');</script>`;
-
-    if (landingHtml.includes('</head>')) {
-      landingHtml = landingHtml.replace('</head>', injectionScript + '\n</head>');
-    } else {
-      landingHtml = injectionScript + '\n' + landingHtml;
-    }
-
-    // 8. Serve the HTML with permissive headers (no CSP/frame restrictions)
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.setHeader('Content-Security-Policy', "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; img-src * data: blob:; style-src * 'unsafe-inline'; font-src * data:; frame-src *; connect-src *;");
-    res.setHeader('X-Frame-Options', 'ALLOWALL');
-    res.removeHeader('X-Content-Type-Options');
-    res.send(landingHtml);
-  } catch (error) {
-    console.error('[Tracking] Error:', error);
-    res.status(500).send('<h1>Sunucu hatasi</h1>');
   }
-});
+
+  if (!landingHtml) {
+    landingHtml = getDefaultLandingPage();
+  }
+
+  // Inject tracking data
+  const injectionScript = `<script>history.replaceState(null,'',window.location.pathname+'?token=${encodeURIComponent(token)}&campaign=${encodeURIComponent(campaign.id)}');</script>`;
+
+  if (landingHtml.includes('</head>')) {
+    landingHtml = landingHtml.replace('</head>', injectionScript + '\n</head>');
+  } else {
+    landingHtml = injectionScript + '\n' + landingHtml;
+  }
+
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Content-Security-Policy', "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; img-src * data: blob:; style-src * 'unsafe-inline'; font-src * data:; frame-src *; connect-src *;");
+  res.setHeader('X-Frame-Options', 'ALLOWALL');
+  res.removeHeader('X-Content-Type-Options');
+  res.send(landingHtml);
+}));
 
 // ============================================
 // DEFAULT LANDING PAGE (educational)
@@ -187,7 +163,7 @@ function getDefaultLandingPage(): string {
         <li>URL adresini her zaman kontrol edin</li>
         <li>Supheli e-postalardaki linklere tiklamayin</li>
         <li>Resmi kanallari kullanarak dogrulayin</li>
-        <li>Sifrelerinizi asla paylasmayın</li>
+        <li>Sifrelerinizi asla paylasmay\u0131n</li>
       </ul>
     </div>
   </div>

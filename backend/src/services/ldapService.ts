@@ -2,6 +2,9 @@ import ldap from 'ldapjs';
 import { config } from '../config.js';
 import { getPool, memoryStore, generateId, generateToken } from '../db/index.js';
 import type { Recipient } from '../types/index.js';
+import { createLogger } from '../utils/logger.js';
+
+const log = createLogger('LDAP');
 
 // ============================================
 // LDAP CLIENT
@@ -17,7 +20,7 @@ function getClient(): ldap.Client {
     });
 
     ldapClient.on('error', (err) => {
-      console.error('[LDAP] Connection error:', err.message);
+      log.error('Connection error', { error: err.message });
       ldapClient = null;
     });
   }
@@ -27,7 +30,7 @@ function getClient(): ldap.Client {
 export function closeLdapConnection(): void {
   if (ldapClient) {
     ldapClient.unbind(() => {
-      console.log('[LDAP] Connection closed');
+      log.info('Connection closed');
     });
     ldapClient = null;
   }
@@ -42,7 +45,7 @@ async function bindAdmin(): Promise<void> {
     const client = getClient();
     client.bind(config.ldap.adminDn, config.ldap.adminPassword, (err) => {
       if (err) {
-        console.error('[LDAP] Bind failed:', err.message);
+        log.error('Bind failed', { error: err.message });
         reject(new Error(`LDAP bind failed: ${err.message}`));
       } else {
         resolve();
@@ -58,10 +61,10 @@ async function bindAdmin(): Promise<void> {
 export async function testLdapConnection(): Promise<boolean> {
   try {
     await bindAdmin();
-    console.log('[LDAP] Connection successful');
+    log.info('Connection successful');
     return true;
   } catch (error) {
-    console.error('[LDAP] Connection test failed:', error);
+    log.error('Connection test failed', { error: error instanceof Error ? error.message : String(error) });
     return false;
   }
 }
@@ -69,74 +72,53 @@ export async function testLdapConnection(): Promise<boolean> {
 // ============================================
 // LDAP HEALTH CHECK (startup diagnostics)
 // ============================================
-// Verifies LDAP connectivity AND validates that the configured
-// Base DN actually exists. Logs actionable error messages.
 
 export async function ldapHealthCheck(): Promise<void> {
   const { url, adminDn, baseDn, usersOu, userFilter, mapping } = config.ldap;
 
-  console.log('[LDAP] ─── Health Check ───────────────────────');
-  console.log(`[LDAP]   URL           : ${url}`);
-  console.log(`[LDAP]   Admin DN      : ${adminDn}`);
-  console.log(`[LDAP]   Base DN       : ${baseDn}`);
-  console.log(`[LDAP]   Users OU      : ${usersOu || '(root of base DN)'}`);
-  console.log(`[LDAP]   User Filter   : ${userFilter}`);
-  console.log(`[LDAP]   Attr Mapping  : email=${mapping.email}, firstName=${mapping.firstName}, lastName=${mapping.lastName}, username=${mapping.username}, fullName=${mapping.fullName}, department=${mapping.department}, title=${mapping.title}`);
+  log.info('Health Check', { url, adminDn, baseDn, usersOu: usersOu || '(root)', userFilter });
+  log.info('Attribute Mapping', { ...mapping });
 
   // 1. Test bind
   try {
     await bindAdmin();
-    console.log('[LDAP]   Bind          : OK');
-  } catch (error) {
-    console.error('[LDAP]   Bind          : FAILED');
-    console.error('[LDAP]   ╰─ Could not authenticate to LDAP server.');
-    console.error('[LDAP]   ╰─ Check LDAP_URL, LDAP_ADMIN_DN, and LDAP_ADMIN_PASSWORD.');
-    console.log('[LDAP] ──────────────────────────────────────');
+    log.info('Bind: OK');
+  } catch {
+    log.error('Bind: FAILED — Check LDAP_URL, LDAP_ADMIN_DN, and LDAP_ADMIN_PASSWORD');
     return;
   }
 
   // 2. Verify Base DN exists
   const baseDnExists = await verifyDnExists(baseDn);
   if (!baseDnExists) {
-    console.error('[LDAP]   Base DN       : NOT FOUND');
-    console.error(`[LDAP]   ╰─ The Base DN "${baseDn}" does not exist on this server.`);
-    console.error('[LDAP]   ╰─ This usually means an environment mismatch.');
-    console.error('[LDAP]   ╰─ Check LDAP_BASE_DN in your .env or docker-compose.yml.');
-    console.log('[LDAP] ──────────────────────────────────────');
+    log.error('Base DN not found — check LDAP_BASE_DN', { baseDn });
     return;
   }
-  console.log('[LDAP]   Base DN       : OK');
+  log.info('Base DN: OK');
 
   // 3. Verify Users OU (search base) exists
   const searchBase = usersOu ? `${usersOu},${baseDn}` : baseDn;
   if (usersOu) {
     const ouExists = await verifyDnExists(searchBase);
     if (!ouExists) {
-      console.error(`[LDAP]   Users OU      : NOT FOUND ("${searchBase}")`);
-      console.error('[LDAP]   ╰─ The organizational unit for users does not exist.');
-      console.error('[LDAP]   ╰─ Check LDAP_USERS_OU in your .env or docker-compose.yml.');
-      console.log('[LDAP] ──────────────────────────────────────');
+      log.error('Users OU not found — check LDAP_USERS_OU', { searchBase });
       return;
     }
-    console.log('[LDAP]   Users OU      : OK');
+    log.info('Users OU: OK');
   }
 
   // 4. Quick count of users matching the filter
   try {
     const users = await searchLdapUsers();
-    console.log(`[LDAP]   Users Found   : ${users.length}`);
+    log.info(`Users found: ${users.length}`);
     if (users.length === 0) {
-      console.warn('[LDAP]   ╰─ Warning: Connection is OK but 0 users matched the filter.');
-      console.warn(`[LDAP]   ╰─ Search Base: ${searchBase}`);
-      console.warn(`[LDAP]   ╰─ Filter: ${userFilter}`);
-      console.warn('[LDAP]   ╰─ Check LDAP_USER_FILTER and LDAP_USERS_OU.');
+      log.warn('0 users matched filter — check LDAP_USER_FILTER and LDAP_USERS_OU', { searchBase, userFilter });
     }
   } catch {
-    console.warn('[LDAP]   Users Found   : Could not enumerate (non-fatal)');
+    log.warn('Could not enumerate users (non-fatal)');
   }
 
-  console.log('[LDAP]   Status        : READY');
-  console.log('[LDAP] ──────────────────────────────────────');
+  log.info('Status: READY');
 }
 
 // ============================================
@@ -211,7 +193,7 @@ export async function searchLdapUsers(): Promise<LdapUser[]> {
 
     client.search(searchBase, opts, (err, res) => {
       if (err) {
-        console.error('[LDAP] Search error:', err.message);
+        log.error('Search error', { error: err.message });
         return reject(new Error(`LDAP search failed: ${err.message}`));
       }
 
@@ -247,15 +229,15 @@ export async function searchLdapUsers(): Promise<LdapUser[]> {
       });
 
       res.on('error', (err) => {
-        console.error('[LDAP] Search stream error:', err.message);
+        log.error('Search stream error', { error: err.message });
         reject(new Error(`LDAP search stream error: ${err.message}`));
       });
 
       res.on('end', (result) => {
         if (result?.status !== 0) {
-          console.warn('[LDAP] Search ended with status:', result?.status);
+          log.warn('Search ended with non-zero status', { status: result?.status });
         }
-        console.log(`[LDAP] Search completed: ${users.length} users found`);
+        log.info(`Search completed: ${users.length} users found`);
         resolve(users);
       });
     });
@@ -305,7 +287,7 @@ export async function syncLdapUsersToCampaign(campaignId: string): Promise<SyncR
     result.message = error instanceof Error
       ? `LDAP connection/search failed: ${error.message}`
       : 'LDAP connection/search failed: Unknown error';
-    console.error('[LDAP Sync]', result.message);
+    log.error(result.message);
     throw error;
   }
 
@@ -319,7 +301,7 @@ export async function syncLdapUsersToCampaign(campaignId: string): Promise<SyncR
       `Search Base: "${searchBase}", Filter: "${config.ldap.userFilter}". ` +
       `This may indicate an empty directory or a filter/OU mismatch. ` +
       `Check LDAP_USERS_OU, LDAP_USER_FILTER, and LDAP_ATTR_EMAIL in your environment.`;
-    console.warn(`[LDAP Sync] ${result.message}`);
+    log.warn(result.message);
     return result;
   }
 
@@ -372,53 +354,84 @@ export async function syncLdapUsersToCampaign(campaignId: string): Promise<SyncR
     const p = await getPool();
     if (!p) throw new Error('Database not available');
 
-    for (const user of ldapUsers) {
+    // Batch insert in chunks of 50 to avoid blocking the event loop
+    const BATCH_SIZE = 50;
+    for (let i = 0; i < ldapUsers.length; i += BATCH_SIZE) {
+      const batch = ldapUsers.slice(i, i + BATCH_SIZE);
+
+      // Build a multi-row VALUES clause for the batch
+      const values: unknown[] = [];
+      const placeholders: string[] = [];
+      batch.forEach((user, idx) => {
+        const offset = idx * 8;
+        placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8})`);
+        values.push(
+          campaignId,
+          user.email,
+          user.firstName || user.fullName || 'Unknown',
+          user.lastName || 'Unknown',
+          user.department || '',
+          user.faculty || '',
+          user.title || '',
+          generateToken(),
+        );
+      });
+
       try {
         const insertResult = await p.query(
           `INSERT INTO recipients (campaign_id, email, first_name, last_name, department, faculty, role, token)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+           VALUES ${placeholders.join(', ')}
            ON CONFLICT (campaign_id, email) DO NOTHING
-           RETURNING id`,
-          [
-            campaignId,
-            user.email,
-            user.firstName || user.fullName || 'Unknown',
-            user.lastName || 'Unknown',
-            user.department || '',
-            user.faculty || '',
-            user.title || '',
-            generateToken(),
-          ]
+           RETURNING email`,
+          values
         );
 
-        if (insertResult.rows.length > 0) {
-          result.synced++;
-          result.details.push({
-            email: user.email,
-            status: 'synced',
-          });
-        } else {
-          result.skipped++;
-          result.details.push({
-            email: user.email,
-            status: 'skipped',
-            message: 'Already exists',
-          });
+        const insertedEmails = new Set(insertResult.rows.map((r: { email: string }) => r.email));
+
+        for (const user of batch) {
+          if (insertedEmails.has(user.email)) {
+            result.synced++;
+            result.details.push({ email: user.email, status: 'synced' });
+          } else {
+            result.skipped++;
+            result.details.push({ email: user.email, status: 'skipped', message: 'Already exists' });
+          }
         }
       } catch (dbErr) {
-        result.errors++;
-        result.details.push({
-          email: user.email,
-          status: 'error',
-          message: dbErr instanceof Error ? dbErr.message : 'Unknown error',
-        });
-        console.error(`[LDAP Sync] DB Error (${user.email}):`, dbErr);
+        // If batch fails, fall back to individual inserts for this batch
+        log.warn('Batch insert failed, falling back to individual inserts', { batchStart: i, error: dbErr instanceof Error ? dbErr.message : String(dbErr) });
+        for (const user of batch) {
+          try {
+            const singleResult = await p.query(
+              `INSERT INTO recipients (campaign_id, email, first_name, last_name, department, faculty, role, token)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+               ON CONFLICT (campaign_id, email) DO NOTHING
+               RETURNING id`,
+              [campaignId, user.email, user.firstName || user.fullName || 'Unknown', user.lastName || 'Unknown', user.department || '', user.faculty || '', user.title || '', generateToken()]
+            );
+            if (singleResult.rows.length > 0) {
+              result.synced++;
+              result.details.push({ email: user.email, status: 'synced' });
+            } else {
+              result.skipped++;
+              result.details.push({ email: user.email, status: 'skipped', message: 'Already exists' });
+            }
+          } catch (singleErr) {
+            result.errors++;
+            result.details.push({ email: user.email, status: 'error', message: singleErr instanceof Error ? singleErr.message : 'Unknown error' });
+          }
+        }
+      }
+
+      // Yield to event loop between batches
+      if (i + BATCH_SIZE < ldapUsers.length) {
+        await new Promise(resolve => setTimeout(resolve, 0));
       }
     }
   }
 
   result.message = `Sync completed: ${result.synced} synced, ${result.skipped} skipped, ${result.errors} errors`;
-  console.log(`[LDAP Sync] ${result.message}`);
+  log.info(result.message);
   return result;
 }
 
@@ -511,45 +524,51 @@ export async function syncLdapFacultyToCampaign(campaignId: string, faculty: str
     const p = await getPool();
     if (!p) throw new Error('Database not available');
 
-    for (const user of ldapUsers) {
+    // Batch insert in chunks of 50
+    const BATCH_SIZE = 50;
+    for (let i = 0; i < ldapUsers.length; i += BATCH_SIZE) {
+      const batch = ldapUsers.slice(i, i + BATCH_SIZE);
+      const values: unknown[] = [];
+      const placeholders: string[] = [];
+      batch.forEach((user, idx) => {
+        const offset = idx * 8;
+        placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8})`);
+        values.push(campaignId, user.email, user.firstName || user.fullName || 'Unknown', user.lastName || 'Unknown', user.department || '', user.faculty || '', user.title || '', generateToken());
+      });
+
       try {
         const insertResult = await p.query(
           `INSERT INTO recipients (campaign_id, email, first_name, last_name, department, faculty, role, token)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+           VALUES ${placeholders.join(', ')}
            ON CONFLICT (campaign_id, email) DO NOTHING
-           RETURNING id`,
-          [
-            campaignId,
-            user.email,
-            user.firstName || user.fullName || 'Unknown',
-            user.lastName || 'Unknown',
-            user.department || '',
-            user.faculty || '',
-            user.title || '',
-            generateToken(),
-          ]
+           RETURNING email`,
+          values
         );
-
-        if (insertResult.rows.length > 0) {
-          result.synced++;
-          result.details.push({ email: user.email, status: 'synced' });
-        } else {
-          result.skipped++;
-          result.details.push({ email: user.email, status: 'skipped', message: 'Already exists' });
+        const insertedEmails = new Set(insertResult.rows.map((r: { email: string }) => r.email));
+        for (const user of batch) {
+          if (insertedEmails.has(user.email)) {
+            result.synced++;
+            result.details.push({ email: user.email, status: 'synced' });
+          } else {
+            result.skipped++;
+            result.details.push({ email: user.email, status: 'skipped', message: 'Already exists' });
+          }
         }
       } catch (dbErr) {
-        result.errors++;
-        result.details.push({
-          email: user.email,
-          status: 'error',
-          message: dbErr instanceof Error ? dbErr.message : 'Unknown error',
-        });
+        for (const user of batch) {
+          result.errors++;
+          result.details.push({ email: user.email, status: 'error', message: dbErr instanceof Error ? dbErr.message : 'Unknown error' });
+        }
+      }
+
+      if (i + BATCH_SIZE < ldapUsers.length) {
+        await new Promise(resolve => setTimeout(resolve, 0));
       }
     }
   }
 
   result.message = `Faculty "${faculty}" sync: ${result.synced} synced, ${result.skipped} skipped, ${result.errors} errors`;
-  console.log(`[LDAP Sync] ${result.message}`);
+  log.info(result.message);
   return result;
 }
 

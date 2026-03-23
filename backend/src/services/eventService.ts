@@ -1,6 +1,9 @@
 import { config } from '../config.js';
 import { getPool, memoryStore, generateId } from '../db/index.js';
 import type { CampaignEvent } from '../types/index.js';
+import { createLogger } from '../utils/logger.js';
+
+const log = createLogger('EventService');
 
 // ============================================
 // GET EVENTS BY CAMPAIGN
@@ -54,7 +57,7 @@ export async function insertEvent(
       userAgent,
       createdAt: new Date(),
     });
-    console.log(`Event recorded: ${type} - Campaign: ${campaignId}`);
+    log.debug('Event recorded', { type, campaignId });
     return;
   }
 
@@ -66,5 +69,5 @@ export async function insertEvent(
      VALUES ($1, $2, $3, $4, $5)`,
     [campaignId, type, recipientToken, ipAddress || null, userAgent || null]
   );
-  console.log(`Event recorded: ${type} - Campaign: ${campaignId}`);
+  log.debug('Event recorded', { type, campaignId });
 }

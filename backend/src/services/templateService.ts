@@ -1,6 +1,9 @@
 import { config } from '../config.js';
 import { getPool, memoryStore, generateId } from '../db/index.js';
 import type { EmailTemplate } from '../types/index.js';
+import { createLogger } from '../utils/logger.js';
+
+const log = createLogger('TemplateService');
 
 // ============================================
 // GET EMAIL TEMPLATES
@@ -95,7 +98,7 @@ export async function createEmailTemplate(data: {
       updatedAt: now,
     };
     memoryStore.emailTemplates.push(template);
-    console.log(`Email template created: ${template.name}`);
+    log.info('Email template created', { name: template.name });
     return template;
   }
 
@@ -114,7 +117,7 @@ export async function createEmailTemplate(data: {
   );
 
   const row = result.rows[0];
-  console.log(`Email template created: ${row.name}`);
+  log.info('Email template created', { name: row.name });
 
   return {
     id: row.id,

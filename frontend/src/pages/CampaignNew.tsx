@@ -19,6 +19,13 @@ import {
   Stepper,
   Badge,
   Paper,
+  Modal,
+  ActionIcon,
+  SegmentedControl,
+  Tooltip,
+  Center,
+  Box,
+  Loader,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
@@ -31,6 +38,9 @@ import {
   Users,
   Settings,
   CheckCircle,
+  Eye,
+  Monitor,
+  Smartphone,
 } from 'lucide-react';
 import { api } from '../api';
 import type { Frequency, SendingMode, EmailTemplate, LandingPage, LdapFaculty, Attachment } from '../types';
@@ -93,6 +103,15 @@ export function CampaignNew() {
   const [faculties, setFaculties] = useState<LdapFaculty[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [activeStep, setActiveStep] = useState(0);
+
+  // Preview modal state
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewType, setPreviewType] = useState<'template' | 'landingPage'>('template');
+  const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  // Cache fetched landing page HTML by id so repeated previews don't re-fetch
+  const [lpHtmlCache, setLpHtmlCache] = useState<Record<string, string>>({});
 
   const [form, setForm] = useState({
     name: '',
@@ -182,6 +201,72 @@ export function CampaignNew() {
     return att ? att.originalName : 'Secilmedi';
   }, [form.attachmentId, attachments]);
 
+  // ── Preview helpers ──
+  const previewTitle = useMemo(() => {
+    if (previewType === 'template') {
+      const tpl = templates.find(t => t.id === form.templateId);
+      return tpl ? `E-posta Onizleme: ${tpl.name}` : 'E-posta Onizleme';
+    }
+    const lp = landingPages.find(p => p.id === form.landingPageId);
+    return lp ? `Landing Page Onizleme: ${lp.name}` : 'Landing Page Onizleme';
+  }, [previewType, form.templateId, form.landingPageId, templates, landingPages]);
+
+  const openPreview = async (type: 'template' | 'landingPage') => {
+    setPreviewType(type);
+    setPreviewDevice('desktop');
+
+    if (type === 'template') {
+      const tpl = templates.find(t => t.id === form.templateId);
+      console.log('[Preview] Template ID:', form.templateId, 'Found:', tpl?.name || 'NOT FOUND');
+      setPreviewHtml(tpl?.body || null);
+      setPreviewOpen(true);
+      return;
+    }
+
+    // Landing page: html is NOT in the list response (stripped for performance).
+    // Fetch the full object on-demand via getLandingPage(id).
+    const lpId = form.landingPageId;
+    const lpMeta = landingPages.find(p => p.id === lpId);
+    console.log('[Preview] Landing Page ID:', lpId, 'Meta:', lpMeta?.name || 'NOT FOUND');
+
+    // Check cache first
+    if (lpId && lpHtmlCache[lpId]) {
+      console.log('[Preview] Using cached HTML for LP:', lpId);
+      setPreviewHtml(lpHtmlCache[lpId]);
+      setPreviewOpen(true);
+      return;
+    }
+
+    if (!lpId) {
+      setPreviewHtml(null);
+      setPreviewOpen(true);
+      return;
+    }
+
+    // Fetch full landing page with HTML
+    setPreviewLoading(true);
+    setPreviewHtml(null);
+    setPreviewOpen(true);
+
+    try {
+      const fullLp = await api.getLandingPage(lpId);
+      console.log('[Preview] Fetched LP:', fullLp?.name, 'HTML length:', fullLp?.html?.length || 0);
+      const html = fullLp?.html || null;
+      setPreviewHtml(html);
+      if (html) {
+        setLpHtmlCache(prev => ({ ...prev, [lpId]: html }));
+      }
+    } catch (err) {
+      console.error('[Preview] Failed to fetch landing page:', err);
+      setPreviewHtml(null);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const canPreviewTemplate = form.templateMode === 'specific' && !!form.templateId;
+  const canPreviewLandingPage = !!form.landingPageId;
+
   // ── Step validation ──
   const validateStep = (step: number): boolean => {
     setStepError(null);
@@ -232,14 +317,22 @@ export function CampaignNew() {
     setLoading(true);
     setError(null);
 
+    // Ensure startDate and startTime are valid before sending
+    const safeStartDate = /^\d{4}-\d{2}-\d{2}$/.test(form.startDate)
+      ? form.startDate
+      : new Date().toISOString().split('T')[0];
+    const safeStartTime = /^\d{2}:\d{2}$/.test(form.startTime)
+      ? form.startTime
+      : '09:00';
+
     try {
       const campaign = await api.createCampaign({
         name: form.name,
         description: '',
         targetCount: 0,
         frequency: form.frequency,
-        startDate: form.startDate,
-        startTime: form.startTime,
+        startDate: safeStartDate,
+        startTime: safeStartTime,
         timezone: form.timezone,
         sendingMode: form.sendingMode,
         spreadDays: form.spreadDays,
@@ -439,28 +532,58 @@ export function CampaignNew() {
                   />
 
                   {form.templateMode === 'specific' && (
-                    <Select
-                      label="E-posta Sablonu"
-                      placeholder="-- Sablon Secin --"
-                      data={templateOptions}
-                      value={form.templateId || null}
-                      onChange={v => updateForm('templateId', v || '')}
-                      allowDeselect={false}
-                      disabled={loading}
-                      searchable
-                    />
+                    <Group align="flex-end" gap="xs">
+                      <Select
+                        label="E-posta Sablonu"
+                        placeholder="-- Sablon Secin --"
+                        data={templateOptions}
+                        value={form.templateId || null}
+                        onChange={v => updateForm('templateId', v || '')}
+                        allowDeselect={false}
+                        disabled={loading}
+                        searchable
+                        style={{ flex: 1 }}
+                      />
+                      <Tooltip label="Sablon Onizleme">
+                        <ActionIcon
+                          variant="light"
+                          color="electricBlue"
+                          size="lg"
+                          radius="md"
+                          disabled={!canPreviewTemplate}
+                          onClick={() => openPreview('template')}
+                        >
+                          <Eye size={18} />
+                        </ActionIcon>
+                      </Tooltip>
+                    </Group>
                   )}
 
-                  <Select
-                    label="Landing Page"
-                    placeholder="-- Landing Page Secin --"
-                    data={landingPageOptions}
-                    value={form.landingPageId || null}
-                    onChange={v => updateForm('landingPageId', v || '')}
-                    allowDeselect
-                    clearable
-                    disabled={loading}
-                  />
+                  <Group align="flex-end" gap="xs">
+                    <Select
+                      label="Landing Page"
+                      placeholder="-- Landing Page Secin --"
+                      data={landingPageOptions}
+                      value={form.landingPageId || null}
+                      onChange={v => updateForm('landingPageId', v || '')}
+                      allowDeselect
+                      clearable
+                      disabled={loading}
+                      style={{ flex: 1 }}
+                    />
+                    <Tooltip label="Landing Page Onizleme">
+                      <ActionIcon
+                        variant="light"
+                        color="electricBlue"
+                        size="lg"
+                        radius="md"
+                        disabled={!canPreviewLandingPage}
+                        onClick={() => openPreview('landingPage')}
+                      >
+                        <Eye size={18} />
+                      </ActionIcon>
+                    </Tooltip>
+                  </Group>
                 </Stack>
               </Card>
 
@@ -762,6 +885,95 @@ export function CampaignNew() {
 
         </Stack>
       </form>
+
+      {/* ───── Preview Modal ───── */}
+      <Modal
+        opened={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        title={
+          <Group gap="sm">
+            <Eye size={18} />
+            <Text fw={600}>{previewTitle}</Text>
+          </Group>
+        }
+        size="95vw"
+        styles={{
+          body: { height: '80vh', display: 'flex', flexDirection: 'column', padding: 0 },
+          content: { backgroundColor: 'var(--app-surface)' },
+          header: { backgroundColor: 'var(--app-surface)', borderBottom: '1px solid var(--app-border)' },
+        }}
+      >
+        {/* Device toggle toolbar */}
+        <Group
+          justify="center"
+          py="sm"
+          px="md"
+          style={{ borderBottom: '1px solid var(--app-border)' }}
+        >
+          <SegmentedControl
+            size="xs"
+            value={previewDevice}
+            onChange={v => setPreviewDevice(v as 'desktop' | 'mobile')}
+            data={[
+              {
+                value: 'desktop',
+                label: (
+                  <Group gap={6} wrap="nowrap">
+                    <Monitor size={14} />
+                    <span>Masaustu</span>
+                  </Group>
+                ),
+              },
+              {
+                value: 'mobile',
+                label: (
+                  <Group gap={6} wrap="nowrap">
+                    <Smartphone size={14} />
+                    <span>Mobil</span>
+                  </Group>
+                ),
+              },
+            ]}
+          />
+          <Badge variant="light" color="dimmed" size="sm">
+            {previewDevice === 'desktop' ? '100%' : '375px'}
+          </Badge>
+        </Group>
+
+        {/* Iframe preview area */}
+        <Box style={{ flex: 1, overflow: 'auto', backgroundColor: '#e9ecef', padding: 16 }}>
+          {previewLoading ? (
+            <Center h="100%">
+              <Stack align="center" gap="sm">
+                <Loader color="electricBlue" size="lg" />
+                <Text c="dimmed" size="sm">Icerik yukleniyor...</Text>
+              </Stack>
+            </Center>
+          ) : previewHtml ? (
+            <Center>
+              <iframe
+                title="content-preview"
+                srcDoc={previewHtml}
+                sandbox={previewType === 'landingPage' ? 'allow-scripts allow-same-origin' : 'allow-same-origin'}
+                style={{
+                  width: previewDevice === 'desktop' ? '100%' : 375,
+                  maxWidth: '100%',
+                  height: '100%',
+                  minHeight: 'calc(80vh - 120px)',
+                  border: '1px solid #dee2e6',
+                  borderRadius: 8,
+                  backgroundColor: '#ffffff',
+                  transition: 'width 300ms ease',
+                }}
+              />
+            </Center>
+          ) : (
+            <Center h="100%">
+              <Text c="dimmed">Onizlenecek icerik bulunamadi. Lutfen bir sablon veya landing page secin.</Text>
+            </Center>
+          )}
+        </Box>
+      </Modal>
     </Stack>
   );
 }

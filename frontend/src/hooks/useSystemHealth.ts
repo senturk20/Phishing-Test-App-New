@@ -22,7 +22,8 @@ export function useSystemHealth(intervalMs = 30_000) {
 
     try {
       const result = await api.testLdapConnection();
-      setHealth(prev => ({ ...prev, ldap: result.success ? 'connected' : 'disconnected' }));
+      // After envelope unwrap, result is { connected: boolean, message: string }
+      setHealth(prev => ({ ...prev, ldap: result.connected ? 'connected' : 'disconnected' }));
     } catch {
       setHealth(prev => ({ ...prev, ldap: 'disconnected' }));
     }

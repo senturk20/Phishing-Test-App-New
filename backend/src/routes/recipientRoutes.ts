@@ -1,4 +1,4 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router, Request, Response } from 'express';
 import {
   getRecipientsByCampaign,
   createRecipient,
@@ -8,6 +8,7 @@ import {
   getRecipientByToken,
 } from '../services/index.js';
 import type { RecipientStatus } from '../types/index.js';
+import { asyncHandler, sendSuccess, sendError } from '../utils/asyncHandler.js';
 
 const router = Router();
 
@@ -40,115 +41,73 @@ interface BulkRecipientsBody {
 // CAMPAIGN RECIPIENT ROUTES
 // ============================================
 
-// Get recipients for campaign
-router.get('/campaigns/:id/recipients', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const recipients = await getRecipientsByCampaign(req.params.id);
-    res.json(recipients);
-  } catch (err) {
-    next(err);
+router.get('/campaigns/:id/recipients', asyncHandler(async (req: Request, res: Response) => {
+  const recipients = await getRecipientsByCampaign(req.params.id);
+  sendSuccess(res, recipients);
+}));
+
+router.post('/campaigns/:id/recipients', asyncHandler(async (req: Request, res: Response) => {
+  if (!isValidRecipientBody(req.body)) { sendError(res, 400, 'Invalid request body'); return; }
+
+  const recipient = await createRecipient({
+    campaignId: req.params.id,
+    email: req.body.email.trim(),
+    firstName: req.body.firstName.trim(),
+    lastName: req.body.lastName.trim(),
+  });
+
+  sendSuccess(res, recipient, 201);
+}));
+
+router.post('/campaigns/:id/recipients/bulk', asyncHandler(async (req: Request, res: Response) => {
+  const body = req.body as BulkRecipientsBody;
+  if (!Array.isArray(body.recipients) || body.recipients.length === 0) {
+    sendError(res, 400, 'Invalid request body');
+    return;
   }
-});
 
-// Add single recipient to campaign
-router.post('/campaigns/:id/recipients', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    if (!isValidRecipientBody(req.body)) {
-      res.status(400).json({ error: 'Invalid request body' });
-      return;
-    }
+  const validRecipients = body.recipients.filter(isValidRecipientBody).map((r) => ({
+    email: r.email.trim(),
+    firstName: r.firstName.trim(),
+    lastName: r.lastName.trim(),
+  }));
 
-    const recipient = await createRecipient({
-      campaignId: req.params.id,
-      email: req.body.email.trim(),
-      firstName: req.body.firstName.trim(),
-      lastName: req.body.lastName.trim(),
-    });
-
-    res.status(201).json(recipient);
-  } catch (err) {
-    next(err);
+  if (validRecipients.length === 0) {
+    sendError(res, 400, 'No valid recipients provided');
+    return;
   }
-});
 
-// Bulk add recipients
-router.post('/campaigns/:id/recipients/bulk', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const body = req.body as BulkRecipientsBody;
-    if (!Array.isArray(body.recipients) || body.recipients.length === 0) {
-      res.status(400).json({ error: 'Invalid request body' });
-      return;
-    }
-
-    const validRecipients = body.recipients.filter(isValidRecipientBody).map((r) => ({
-      email: r.email.trim(),
-      firstName: r.firstName.trim(),
-      lastName: r.lastName.trim(),
-    }));
-
-    if (validRecipients.length === 0) {
-      res.status(400).json({ error: 'No valid recipients provided' });
-      return;
-    }
-
-    const count = await createRecipientsBulk(req.params.id, validRecipients);
-    res.status(201).json({ success: true, count });
-  } catch (err) {
-    next(err);
-  }
-});
+  const count = await createRecipientsBulk(req.params.id, validRecipients);
+  sendSuccess(res, { count }, 201);
+}));
 
 // ============================================
 // STANDALONE RECIPIENT ROUTES
 // ============================================
 
-// Delete recipient
-router.delete('/recipients/:id', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const deleted = await deleteRecipient(req.params.id);
-    if (!deleted) {
-      res.status(404).json({ error: 'Recipient not found' });
-      return;
-    }
-    res.json({ success: true });
-  } catch (err) {
-    next(err);
-  }
-});
+router.delete('/recipients/:id', asyncHandler(async (req: Request, res: Response) => {
+  const deleted = await deleteRecipient(req.params.id);
+  if (!deleted) { sendError(res, 404, 'Recipient not found'); return; }
+  sendSuccess(res, null);
+}));
 
-// Get recipient by token
-router.get('/recipients/token/:token', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const recipient = await getRecipientByToken(req.params.token);
-    if (!recipient) {
-      res.status(404).json({ error: 'Recipient not found' });
-      return;
-    }
-    res.json(recipient);
-  } catch (err) {
-    next(err);
-  }
-});
+router.get('/recipients/token/:token', asyncHandler(async (req: Request, res: Response) => {
+  const recipient = await getRecipientByToken(req.params.token);
+  if (!recipient) { sendError(res, 404, 'Recipient not found'); return; }
+  sendSuccess(res, recipient);
+}));
 
-// Update recipient status
-router.patch('/recipients/token/:token/status', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { status } = req.body as { status: string };
-    const validStatuses: RecipientStatus[] = ['pending', 'sent', 'clicked', 'submitted', 'failed'];
-    if (!validStatuses.includes(status as RecipientStatus)) {
-      res.status(400).json({ error: 'Invalid status' });
-      return;
-    }
-
-    const recipient = await updateRecipientStatus(req.params.token, status as RecipientStatus);
-    if (!recipient) {
-      res.status(404).json({ error: 'Recipient not found' });
-      return;
-    }
-    res.json(recipient);
-  } catch (err) {
-    next(err);
+router.patch('/recipients/token/:token/status', asyncHandler(async (req: Request, res: Response) => {
+  const { status } = req.body as { status: string };
+  const validStatuses: RecipientStatus[] = ['pending', 'sent', 'clicked', 'submitted', 'failed'];
+  if (!validStatuses.includes(status as RecipientStatus)) {
+    sendError(res, 400, 'Invalid status');
+    return;
   }
-});
+
+  const recipient = await updateRecipientStatus(req.params.token, status as RecipientStatus);
+  if (!recipient) { sendError(res, 404, 'Recipient not found'); return; }
+  sendSuccess(res, recipient);
+}));
 
 export default router;

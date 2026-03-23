@@ -1,4 +1,7 @@
 import { config } from '../config.js';
+import { createLogger } from '../utils/logger.js';
+
+const log = createLogger('Database');
 
 let pool: import('pg').Pool | null = null;
 
@@ -17,7 +20,7 @@ export async function getPool() {
 
 export async function testConnection(): Promise<boolean> {
   if (config.useMemoryDb) {
-    console.log('Using in-memory database');
+    log.info('Using in-memory database');
     return true;
   }
 
@@ -27,10 +30,10 @@ export async function testConnection(): Promise<boolean> {
     const client = await p.connect();
     await client.query('SELECT 1');
     client.release();
-    console.log('PostgreSQL connection successful');
+    log.info('PostgreSQL connection successful');
     return true;
   } catch (error) {
-    console.error('PostgreSQL connection failed:', error);
+    log.error('PostgreSQL connection failed', { error: error instanceof Error ? error.message : String(error) });
     return false;
   }
 }
@@ -38,6 +41,6 @@ export async function testConnection(): Promise<boolean> {
 export async function closePool(): Promise<void> {
   if (pool) {
     await pool.end();
-    console.log('Database pool closed');
+    log.info('Database pool closed');
   }
 }

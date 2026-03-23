@@ -5,6 +5,9 @@ import { sendEmail } from './mailService.js';
 import { updateRecipientStatus } from './recipientService.js';
 import { QUEUE_NAME, getRedisOpts } from './queueService.js';
 import type { EmailJobData } from './queueService.js';
+import { createLogger } from '../utils/logger.js';
+
+const log = createLogger('MailWorker');
 
 // ============================================
 // MAIL WORKER
@@ -14,7 +17,7 @@ let worker: Worker | null = null;
 
 export function startMailWorker(): void {
   if (worker) {
-    console.warn('[MailWorker] Already running');
+    log.warn('Already running');
     return;
   }
 
@@ -23,7 +26,7 @@ export function startMailWorker(): void {
     async (job: Job) => {
       const { recipientToken, recipientEmail, subject, html, campaignName } = job.data as EmailJobData;
 
-      console.log(`[MailWorker] Processing job ${job.id} | Campaign: ${campaignName} | To: ${recipientEmail}`);
+      log.info('Processing job', { jobId: job.id, campaignName, to: recipientEmail });
 
       // Anti-spam jitter: random delay 2-5 seconds before each send
       const jitter = 2000 + Math.random() * 3000;
@@ -53,35 +56,33 @@ export function startMailWorker(): void {
 
   worker.on('completed', (job) => {
     const data = job.data as EmailJobData;
-    console.log(`[MailWorker] Sent to ${data.recipientEmail}`);
+    log.info('Sent', { to: data.recipientEmail });
   });
 
   worker.on('failed', (job, err) => {
     if (!job) return;
     const data = job.data as EmailJobData;
-    console.error(`[MailWorker] Job ${job.id} failed (attempt ${job.attemptsMade}/${job.opts?.attempts || 3}):`, err.message);
+    log.error('Job failed', { jobId: job.id, attempt: job.attemptsMade, maxAttempts: job.opts?.attempts || 3, error: err.message });
 
     // On final failure, mark recipient as 'failed'
     if (job.attemptsMade >= (job.opts?.attempts || 3)) {
       updateRecipientStatus(data.recipientToken, 'failed').catch((e) =>
-        console.error(`[MailWorker] Failed to update status for ${data.recipientEmail}:`, e)
+        log.error('Failed to update status', { to: data.recipientEmail, error: String(e) })
       );
     }
   });
 
   worker.on('error', (err) => {
-    console.error('[MailWorker] Worker error:', err);
+    log.error('Worker error', { error: String(err) });
   });
 
-  console.log(
-    `[MailWorker] Started | concurrency: ${config.queue.concurrency} | rate limit: ${config.queue.rateMax}/${config.queue.rateDuration}ms`
-  );
+  log.info('Started', { concurrency: config.queue.concurrency, rateMax: config.queue.rateMax, rateDuration: config.queue.rateDuration });
 }
 
 export async function stopMailWorker(): Promise<void> {
   if (worker) {
     await worker.close();
     worker = null;
-    console.log('[MailWorker] Stopped');
+    log.info('Stopped');
   }
 }

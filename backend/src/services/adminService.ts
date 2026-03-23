@@ -2,6 +2,9 @@ import bcrypt from 'bcrypt';
 import { config } from '../config.js';
 import { getPool, memoryStore, generateId } from '../db/index.js';
 import type { Admin } from '../types/index.js';
+import { createLogger } from '../utils/logger.js';
+
+const log = createLogger('AdminService');
 
 const SALT_ROUNDS = 10;
 
@@ -148,6 +151,6 @@ export async function seedDefaultAdminIfNeeded(): Promise<void> {
       `INSERT INTO admins (username, password_hash, role) VALUES ($1, $2, $3)`,
       ['admin', hash, 'admin']
     );
-    console.log('[Auth] Default admin seeded (admin / admin123)');
+    log.info('Default admin seeded (admin / admin123)');
   }
 }

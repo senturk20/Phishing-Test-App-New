@@ -2,7 +2,10 @@ import { Router, Request, Response } from 'express';
 import { getRecipientByToken, insertEvent } from '../services/index.js';
 import { config } from '../config.js';
 import { getPool, memoryStore } from '../db/index.js';
+import { extractClientInfo } from '../utils/eventLogger.js';
+import { createLogger } from '../utils/logger.js';
 
+const log = createLogger('Pixel');
 const router = Router();
 
 // 1x1 transparent GIF (43 bytes)
@@ -14,9 +17,6 @@ const TRANSPARENT_GIF = Buffer.from(
 // ============================================
 // GET /static/images/footer-header.png?t=TOKEN
 // ============================================
-// Stealth tracking pixel — injected into outbound emails.
-// When the email client loads this image, we log an 'opened' event.
-// Deduplication: only one 'opened' event per recipient.
 
 router.get('/footer-header.png', async (req: Request, res: Response) => {
   // Always return the image — even if token is invalid
@@ -60,14 +60,12 @@ router.get('/footer-header.png', async (req: Request, res: Response) => {
     }
 
     if (!alreadyOpened) {
-      const ipAddress = req.ip || req.socket.remoteAddress;
-      const userAgent = req.get('User-Agent');
+      const { ipAddress, userAgent } = extractClientInfo(req);
       await insertEvent('opened', recipient.campaignId, token, ipAddress, userAgent);
-      console.log(`[Pixel] Email opened: token=${token}, campaign=${recipient.campaignId}`);
+      log.info('Email opened', { token, campaignId: recipient.campaignId });
     }
   } catch (err) {
-    // Never fail the image response — log and move on
-    console.error('[Pixel] Error tracking open:', err);
+    log.error('Error tracking open', { error: err instanceof Error ? err.message : String(err) });
   }
 
   res.end(TRANSPARENT_GIF);

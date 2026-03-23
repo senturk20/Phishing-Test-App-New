@@ -1,4 +1,4 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router, Request, Response } from 'express';
 import {
   getCampaigns,
   getCampaign,
@@ -10,8 +10,9 @@ import {
   resumeCampaign,
   completeCampaign,
   getCampaignStats,
+  getEventsByCampaign,
 } from '../services/index.js';
-import { getEventsByCampaign } from '../services/index.js';
+import { asyncHandler, sendSuccess, sendError } from '../utils/asyncHandler.js';
 
 const router = Router();
 
@@ -64,164 +65,94 @@ interface UpdateCampaignBody {
 // ROUTES
 // ============================================
 
-// List all campaigns
-router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
-  try {
-    const campaigns = await getCampaigns();
-    res.json(campaigns);
-  } catch (err) {
-    console.error('[getCampaigns] Failed to fetch campaigns:', err);
-    next(err);
-  }
-});
+router.get('/', asyncHandler(async (_req: Request, res: Response) => {
+  const campaigns = await getCampaigns();
+  sendSuccess(res, campaigns);
+}));
 
-// Get single campaign with stats and events
-router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const campaign = await getCampaign(req.params.id);
-    if (!campaign) {
-      res.status(404).json({ error: 'Campaign not found' });
-      return;
-    }
+router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
+  const campaign = await getCampaign(req.params.id);
+  if (!campaign) { sendError(res, 404, 'Campaign not found'); return; }
 
-    const [stats, events] = await Promise.all([
-      getCampaignStats(campaign.id),
-      getEventsByCampaign(campaign.id),
-    ]);
+  const [stats, events] = await Promise.all([
+    getCampaignStats(campaign.id),
+    getEventsByCampaign(campaign.id),
+  ]);
 
-    res.json({ ...campaign, stats, events });
-  } catch (err) {
-    next(err);
-  }
-});
+  sendSuccess(res, { ...campaign, stats, events });
+}));
 
-// Create new campaign
-router.post('/', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    if (!isValidCreateCampaign(req.body)) {
-      res.status(400).json({ error: 'Invalid request body' });
-      return;
-    }
+router.post('/', asyncHandler(async (req: Request, res: Response) => {
+  if (!isValidCreateCampaign(req.body)) { sendError(res, 400, 'Invalid request body'); return; }
 
-    const b = req.body;
-    const campaign = await createCampaign({
-      name: b.name.trim(),
-      description: (b.description || '').trim(),
-      targetCount: b.targetCount || 0,
-      frequency: b.frequency,
-      startDate: b.startDate,
-      startTime: b.startTime,
-      timezone: b.timezone,
-      sendingMode: b.sendingMode,
-      spreadDays: b.spreadDays,
-      spreadUnit: b.spreadUnit,
-      businessHoursStart: b.businessHoursStart,
-      businessHoursEnd: b.businessHoursEnd,
-      businessDays: b.businessDays,
-      trackActivityDays: b.trackActivityDays,
-      category: b.category,
-      templateMode: b.templateMode,
-      templateId: b.templateId,
-      phishDomain: b.phishDomain,
-      landingPageId: b.landingPageId,
-      attachmentId: b.attachmentId,
-      addClickersToGroup: b.addClickersToGroup,
-      sendReportEmail: b.sendReportEmail,
-    });
+  const b = req.body;
+  const campaign = await createCampaign({
+    name: b.name.trim(),
+    description: (b.description || '').trim(),
+    targetCount: b.targetCount || 0,
+    frequency: b.frequency,
+    startDate: b.startDate,
+    startTime: b.startTime,
+    timezone: b.timezone,
+    sendingMode: b.sendingMode,
+    spreadDays: b.spreadDays,
+    spreadUnit: b.spreadUnit,
+    businessHoursStart: b.businessHoursStart,
+    businessHoursEnd: b.businessHoursEnd,
+    businessDays: b.businessDays,
+    trackActivityDays: b.trackActivityDays,
+    category: b.category,
+    templateMode: b.templateMode,
+    templateId: b.templateId,
+    phishDomain: b.phishDomain,
+    landingPageId: b.landingPageId,
+    attachmentId: b.attachmentId,
+    addClickersToGroup: b.addClickersToGroup,
+    sendReportEmail: b.sendReportEmail,
+  });
 
-    res.status(201).json(campaign);
-  } catch (err) {
-    next(err);
-  }
-});
+  sendSuccess(res, campaign, 201);
+}));
 
-// Update campaign
-router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const body = req.body as UpdateCampaignBody;
-    const campaign = await updateCampaign(req.params.id, {
-      name: body.name?.trim(),
-      description: body.description?.trim(),
-      targetCount: body.targetCount,
-    });
-    if (!campaign) {
-      res.status(404).json({ error: 'Campaign not found or not editable' });
-      return;
-    }
-    res.json(campaign);
-  } catch (err) {
-    next(err);
-  }
-});
+router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
+  const body = req.body as UpdateCampaignBody;
+  const campaign = await updateCampaign(req.params.id, {
+    name: body.name?.trim(),
+    description: body.description?.trim(),
+    targetCount: body.targetCount,
+  });
+  if (!campaign) { sendError(res, 404, 'Campaign not found or not editable'); return; }
+  sendSuccess(res, campaign);
+}));
 
-// Delete campaign
-router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const deleted = await deleteCampaign(req.params.id);
-    if (!deleted) {
-      res.status(404).json({ error: 'Campaign not found' });
-      return;
-    }
-    res.json({ success: true });
-  } catch (err) {
-    next(err);
-  }
-});
+router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
+  const deleted = await deleteCampaign(req.params.id);
+  if (!deleted) { sendError(res, 404, 'Campaign not found'); return; }
+  sendSuccess(res, null);
+}));
 
-// Start campaign
-router.post('/:id/start', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const campaign = await startCampaign(req.params.id);
-    if (!campaign) {
-      res.status(404).json({ error: 'Campaign not found or already started' });
-      return;
-    }
-    res.json(campaign);
-  } catch (err) {
-    next(err);
-  }
-});
+router.post('/:id/start', asyncHandler(async (req: Request, res: Response) => {
+  const campaign = await startCampaign(req.params.id);
+  if (!campaign) { sendError(res, 404, 'Campaign not found or already started'); return; }
+  sendSuccess(res, campaign);
+}));
 
-// Pause campaign
-router.post('/:id/pause', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const campaign = await pauseCampaign(req.params.id);
-    if (!campaign) {
-      res.status(404).json({ error: 'Campaign not found or not active' });
-      return;
-    }
-    res.json(campaign);
-  } catch (err) {
-    next(err);
-  }
-});
+router.post('/:id/pause', asyncHandler(async (req: Request, res: Response) => {
+  const campaign = await pauseCampaign(req.params.id);
+  if (!campaign) { sendError(res, 404, 'Campaign not found or not active'); return; }
+  sendSuccess(res, campaign);
+}));
 
-// Resume campaign
-router.post('/:id/resume', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const campaign = await resumeCampaign(req.params.id);
-    if (!campaign) {
-      res.status(404).json({ error: 'Campaign not found or not paused' });
-      return;
-    }
-    res.json(campaign);
-  } catch (err) {
-    next(err);
-  }
-});
+router.post('/:id/resume', asyncHandler(async (req: Request, res: Response) => {
+  const campaign = await resumeCampaign(req.params.id);
+  if (!campaign) { sendError(res, 404, 'Campaign not found or not paused'); return; }
+  sendSuccess(res, campaign);
+}));
 
-// Complete campaign
-router.post('/:id/complete', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const campaign = await completeCampaign(req.params.id);
-    if (!campaign) {
-      res.status(404).json({ error: 'Campaign not found or not completable' });
-      return;
-    }
-    res.json(campaign);
-  } catch (err) {
-    next(err);
-  }
-});
+router.post('/:id/complete', asyncHandler(async (req: Request, res: Response) => {
+  const campaign = await completeCampaign(req.params.id);
+  if (!campaign) { sendError(res, 404, 'Campaign not found or not completable'); return; }
+  sendSuccess(res, campaign);
+}));
 
 export default router;

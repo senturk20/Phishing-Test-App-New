@@ -38,6 +38,10 @@ import {
   stopCompletionChecker,
 } from './services/index.js';
 import { verifyToken } from './middleware/auth.js';
+import { globalErrorHandler } from './utils/asyncHandler.js';
+import { createLogger } from './utils/logger.js';
+
+const log = createLogger('Boot');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -255,25 +259,19 @@ app.use('/attachments', verifyToken, attachmentRoutes);
 // ERROR HANDLER
 // ============================================
 
-app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-  console.error('[Express Error]', err.stack || err.message);
-  res.status(500).json({
-    error: config.isProduction ? 'Internal server error' : err.message,
-  });
-});
+app.use(globalErrorHandler);
 
 // ============================================
 // SERVER START
 // ============================================
 
 async function startServer() {
-  console.log('[Boot] Starting server...');
-  console.log(`[Boot] NODE_ENV=${process.env.NODE_ENV}, USE_MEMORY_DB=${config.useMemoryDb}`);
-  console.log(`[Boot] Memory limit: ${process.env.NODE_OPTIONS || 'default'}`);
+  log.info('Starting server...', { NODE_ENV: process.env.NODE_ENV, USE_MEMORY_DB: config.useMemoryDb });
+  log.info('Memory limit', { nodeOptions: process.env.NODE_OPTIONS || 'default' });
 
   const dbConnected = await testConnection();
   if (!dbConnected) {
-    console.error('[Boot] Failed to connect to database. Exiting...');
+    log.error('Failed to connect to database. Exiting...');
     process.exit(1);
   }
 
@@ -316,10 +314,10 @@ async function startServer() {
         // Add 'file_downloaded' + 'opened' to events type check constraint
         await pool.query(`ALTER TABLE events DROP CONSTRAINT IF EXISTS events_type_check;`);
         await pool.query(`ALTER TABLE events ADD CONSTRAINT events_type_check CHECK (type IN ('opened', 'clicked', 'submitted', 'file_downloaded'));`);
-        console.log('[Migration] Schema migrations applied successfully');
+        log.info('Schema migrations applied successfully');
       }
     } catch (err) {
-      console.error('[Migration] Failed to run migrations:', err);
+      log.error('Failed to run migrations', { error: err instanceof Error ? err.message : String(err) });
     }
   }
 
@@ -327,25 +325,25 @@ async function startServer() {
 
   // Non-blocking side tasks
   ldapHealthCheck().catch((err) => {
-    console.error('[LDAP] Health check error:', err.message);
+    log.error('LDAP health check error', { error: err instanceof Error ? err.message : String(err) });
   });
 
   isRedisAvailable().then((available) => {
     if (available) {
       startMailWorker();
-      console.log('[Queue] Mail worker started');
+      log.info('Mail worker started');
     } else {
-      console.log('[Queue] Redis not available, using direct email sending');
+      log.info('Redis not available, using direct email sending');
     }
   }).catch((err) => {
-    console.error('[Queue] Failed to check Redis:', err);
+    log.error('Failed to check Redis', { error: err instanceof Error ? err.message : String(err) });
   });
 
   // Start the campaign completion checker (auto-completes campaigns after trackActivityDays)
   startCompletionChecker();
 
   const server = app.listen(config.port, () => {
-    console.log(`[Boot] Server running on port ${config.port}`);
+    log.info(`Server running on port ${config.port}`);
   });
 
   server.on('error', (err) => {
@@ -355,7 +353,7 @@ async function startServer() {
 
   // Graceful shutdown
   const shutdown = async () => {
-    console.log('[Shutdown] Shutting down gracefully...');
+    log.info('Shutting down gracefully...');
     server.close(async () => {
       try {
         stopCompletionChecker();
@@ -364,7 +362,7 @@ async function startServer() {
         closeLdapConnection();
         await closePool();
       } catch (err) {
-        console.error('[Shutdown] Error during cleanup:', err);
+        log.error('Error during cleanup', { error: err instanceof Error ? err.message : String(err) });
       }
       process.exit(0);
     });

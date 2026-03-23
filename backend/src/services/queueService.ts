@@ -1,5 +1,8 @@
 import { Queue } from 'bullmq';
 import { config } from '../config.js';
+import { createLogger } from '../utils/logger.js';
+
+const log = createLogger('QueueService');
 
 // ============================================
 // JOB DATA INTERFACE
@@ -89,11 +92,11 @@ export async function isRedisAvailable(): Promise<boolean> {
     ]);
     redisAvailable = true;
     redisCheckedAt = now;
-    console.log('[Queue] Redis connection established');
+    log.info('Redis connection established');
   } catch {
     redisAvailable = false;
     redisCheckedAt = now;
-    console.warn('[Queue] Redis not available, falling back to direct send');
+    log.warn('Redis not available, falling back to direct send');
   }
   return redisAvailable;
 }

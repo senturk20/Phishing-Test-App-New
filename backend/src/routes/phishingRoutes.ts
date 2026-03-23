@@ -1,58 +1,47 @@
 import { Router, Request, Response } from 'express';
-import {
-  getRecipientByToken,
-  updateRecipientStatus,
-  insertEvent,
-} from '../services/index.js';
+import { getRecipientByToken } from '../services/index.js';
 import { config } from '../config.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { trackEvent } from '../utils/eventLogger.js';
+import { createLogger } from '../utils/logger.js';
 
+const log = createLogger('Phishing');
 const router = Router();
 
 // ============================================
 // POST /p/:token  — Phishing form submission capture
 // ============================================
-// The cloned landing page's <form> posts here.
-// We log the "submitted" event and redirect to a real university page.
 
-router.post('/:token', async (req: Request, res: Response) => {
+router.post('/:token', asyncHandler(async (req: Request, res: Response) => {
   const { token } = req.params;
 
-  console.log(`[Phishing] Form submission received for token: ${token}`);
-  console.log(`[Phishing] Content-Type: ${req.get('Content-Type')}`);
-  console.log(`[Phishing] Body keys: ${Object.keys(req.body || {}).join(', ') || '(empty)'}`);
+  log.info('Form submission received', { token });
 
   try {
     const recipient = await getRecipientByToken(token);
 
     if (!recipient) {
-      console.log(`[Phishing] Token not found: "${token}" — redirecting anyway`);
+      log.warn('Token not found, redirecting anyway', { token });
       res.redirect(config.finalRedirectUrl);
       return;
     }
 
-    console.log(`[Phishing] Recipient: id=${recipient.id}, campaign=${recipient.campaignId}, status=${recipient.status}`);
+    await trackEvent({
+      type: 'submitted',
+      campaignId: recipient.campaignId,
+      token,
+      req,
+      updateStatus: true,
+    });
 
-    // Insert submitted event
-    const ipAddress = req.ip || req.socket.remoteAddress;
-    const userAgent = req.get('User-Agent');
-    await insertEvent('submitted', recipient.campaignId, token, ipAddress, userAgent);
+    const fields = Object.keys(req.body || {}).join(', ') || '(empty)';
+    log.info('Credentials captured', { token, fields });
 
-    // Update recipient status
-    if (recipient.status === 'sent' || recipient.status === 'clicked') {
-      await updateRecipientStatus(token, 'submitted');
-    }
-
-    const body = req.body || {};
-    const fields = Object.keys(body).join(', ') || '(empty)';
-    console.log(`[Phishing] CAPTURED: token=${token}, fields=${fields}`);
-
-    // Redirect to real university page to maintain illusion
     res.redirect(config.finalRedirectUrl);
   } catch (error) {
-    console.error('[Phishing] Exception during submission:', error);
-    // Still redirect on error — don't expose internal state to the target
+    log.error('Exception during submission', { error: error instanceof Error ? error.message : String(error) });
     res.redirect(config.finalRedirectUrl);
   }
-});
+}));
 
 export default router;

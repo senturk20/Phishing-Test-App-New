@@ -55,7 +55,6 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   });
 
   if (response.status === 401 && !isAssetPath(path)) {
-    // Only clear auth for real API 401s — NOT for phantom asset fetches
     localStorage.removeItem('token');
     localStorage.removeItem('admin');
     window.location.href = '/login';
@@ -63,10 +62,18 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   }
 
   if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`);
+    const errBody = await response.json().catch(() => ({ error: `Request failed: ${response.status}` }));
+    throw new Error(errBody.error || `Request failed: ${response.status}`);
   }
 
-  return response.json();
+  const json = await response.json();
+
+  // Unwrap standardized { success, data } envelope if present
+  if (json && typeof json === 'object' && 'success' in json && 'data' in json) {
+    return json.data as T;
+  }
+
+  return json as T;
 }
 
 export const api = {
@@ -220,7 +227,8 @@ export const api = {
       throw new Error(err.error || `Upload failed: ${response.status}`);
     }
 
-    return response.json();
+    const json = await response.json();
+    return json?.data ?? json;
   },
 
   // Events
@@ -232,7 +240,7 @@ export const api = {
 
   // LDAP
   testLdapConnection: () =>
-    request<{ success: boolean; message: string }>('/ldap/test'),
+    request<{ connected: boolean; message: string }>('/ldap/test'),
 
   getLdapUsers: (faculty?: string) =>
     request<{ users: LdapUser[]; count: number }>(`/ldap/users${faculty ? `?faculty=${faculty}` : ''}`),
@@ -272,7 +280,8 @@ export const api = {
       throw new Error(err.error || `Upload failed: ${response.status}`);
     }
 
-    return response.json();
+    const json = await response.json();
+    return json?.data ?? json;
   },
 
   deleteAttachment: (id: string) =>

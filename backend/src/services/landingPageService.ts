@@ -1,6 +1,9 @@
 import { config } from '../config.js';
 import { getPool, memoryStore, generateId } from '../db/index.js';
 import type { LandingPage } from '../types/index.js';
+import { createLogger } from '../utils/logger.js';
+
+const log = createLogger('LandingPageService');
 
 // ============================================
 // HELPERS
@@ -111,7 +114,7 @@ export async function createLandingPage(data: {
       updatedAt: now,
     };
     memoryStore.landingPages.push(page);
-    console.log(`Landing page created: ${page.name}`);
+    log.info('Landing page created', { name: page.name });
     return page;
   }
 
@@ -129,7 +132,7 @@ export async function createLandingPage(data: {
     [data.name, slug, data.html, data.originalUrl || '', data.isCloned || false, data.isDefault || false]
   );
 
-  console.log(`Landing page created: ${result.rows[0].name}`);
+  log.info('Landing page created', { name: result.rows[0].name });
   return mapRow(result.rows[0]);
 }
 

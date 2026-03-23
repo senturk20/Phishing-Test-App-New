@@ -162,20 +162,17 @@ export async function getDepartmentStats(): Promise<DepartmentStat[]> {
   const p = await getPool();
   if (!p) return [];
 
+  // Subquery-based approach: avoids cartesian explosion from multiple LEFT JOINs
   const result = await p.query(`
     SELECT
       COALESCE(NULLIF(r.faculty, ''), 'Ozel Gonderim') AS faculty,
       COUNT(DISTINCT r.id) AS total_recipients,
       COUNT(DISTINCT CASE WHEN r.status != 'pending' THEN r.token END) AS total_sent,
-      COUNT(DISTINCT CASE WHEN e_open.recipient_token IS NOT NULL THEN r.token END) AS total_opened,
-      COUNT(DISTINCT CASE WHEN e_click.recipient_token IS NOT NULL THEN r.token END) AS total_clicked,
-      COUNT(DISTINCT CASE WHEN e_submit.recipient_token IS NOT NULL THEN r.token END) AS total_submitted,
-      COUNT(DISTINCT CASE WHEN e_dl.recipient_token IS NOT NULL THEN r.token END) AS total_downloads
+      COUNT(DISTINCT CASE WHEN r.token IN (SELECT recipient_token FROM events WHERE type = 'opened') THEN r.token END) AS total_opened,
+      COUNT(DISTINCT CASE WHEN r.token IN (SELECT recipient_token FROM events WHERE type = 'clicked') THEN r.token END) AS total_clicked,
+      COUNT(DISTINCT CASE WHEN r.token IN (SELECT recipient_token FROM events WHERE type = 'submitted') THEN r.token END) AS total_submitted,
+      COUNT(DISTINCT CASE WHEN r.token IN (SELECT recipient_token FROM events WHERE type = 'file_downloaded') THEN r.token END) AS total_downloads
     FROM recipients r
-    LEFT JOIN events e_open ON e_open.recipient_token = r.token AND e_open.type = 'opened'
-    LEFT JOIN events e_click ON e_click.recipient_token = r.token AND e_click.type = 'clicked'
-    LEFT JOIN events e_submit ON e_submit.recipient_token = r.token AND e_submit.type = 'submitted'
-    LEFT JOIN events e_dl ON e_dl.recipient_token = r.token AND e_dl.type = 'file_downloaded'
     GROUP BY COALESCE(NULLIF(r.faculty, ''), 'Ozel Gonderim')
     ORDER BY total_recipients DESC
   `);
